@@ -5,7 +5,7 @@
     "username": "ai_vanvan",
     "folder_strategy": "daily",
     "title_prefix": "海外离大谱#",
-    "firefox_profile": "370tsjzy.default-release",
+    "firefox_profile": "78lwkzul.default-release",
     "download_safety": {
       "max_posts_per_session": 50,
       "request_delay": 45
@@ -19,7 +19,7 @@
     "firefox_profile": "y34y4ur5.aigf8728_instagram",
     "bilibili": {
       "profile_name": "aigf8728_profile",
-      "chrome_profile_path": "c:\\Code\\social-media-hub\\tools\\profiles\\chrome_profile_aigf8728"
+      "chrome_profile_path": "/Users/yanglan/Code/social-media-hub/tools/profiles/chrome_profile_aigf8728"
     },
     "upload_settings": {
       "title_pattern": "ins你的海外第{序号}个女友:{博主ID}",
@@ -59,7 +59,7 @@
     },
     "bilibili": {
       "profile_name": "youtube_gaoxiao_profile",
-      "chrome_profile_path": "c:\\Code\\social-media-hub\\tools\\profiles\\chrome_profile_youtube"
+      "chrome_profile_path": "/Users/yanglan/Code/social-media-hub/tools/profiles/chrome_profile_youtube"
     },
     "upload_settings": {
       "title_pattern": "洋了二正#{序号}",

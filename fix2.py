@@ -1,6 +1,0 @@
-﻿content = open('containers/api-gateway/app.py', encoding='utf-8').read()
-content = content.replace("template_folder=templates,", "template_folder='templates',")
-content = content.replace("static_folder=static)", "static_folder='static')")  
-content = content.replace("render_template(index.html)", "render_template('index.html')")
-open('containers/api-gateway/app.py', 'w', encoding='utf-8').write(content)
-print('Fixed引号问题')
