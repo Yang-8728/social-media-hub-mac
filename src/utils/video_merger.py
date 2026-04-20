@@ -64,15 +64,16 @@ class VideoMerger:
         except Exception as e:
             self.logger.error(f"保存合并记录失败: {e}")
     
-    def add_merged_videos(self, video_paths: List[str], output_path: str):
+    def add_merged_videos(self, video_paths: List[str], output_path: str, chapter_list: str = ""):
         """添加已合并的视频记录"""
         record = self.load_merged_record()
-        
+
         merge_info = {
             "timestamp": datetime.now().isoformat(),
             "output_file": output_path,
             "input_videos": [os.path.abspath(v) for v in video_paths],
-            "input_count": len(video_paths)
+            "input_count": len(video_paths),
+            "chapter_list": chapter_list
         }
         
         record["merged_videos"].append(merge_info)
@@ -198,6 +199,68 @@ class VideoMerger:
             filename = filename.replace(char, '_')
         return filename
     
+    def get_video_duration(self, video_path: str) -> float:
+        """使用ffprobe获取视频时长（秒）"""
+        try:
+            cmd = [
+                "ffprobe",
+                "-v", "quiet",
+                "-show_entries", "format=duration",
+                "-of", "csv=p=0",
+                video_path
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return float(result.stdout.strip())
+        except Exception as e:
+            self.logger.warning(f"无法获取视频时长 {video_path}: {e}")
+            return 0.0
+
+    def get_author_id_for_video(self, video_path: str) -> str:
+        """从下载记录中获取视频的Instagram作者ID"""
+        try:
+            filename = os.path.basename(video_path)
+            shortcode = os.path.splitext(filename)[0]
+
+            download_log_file = os.path.join("logs", "downloads", f"{self.account_name}_downloads.json")
+            if not os.path.exists(download_log_file):
+                return "unknown"
+
+            with open(download_log_file, 'r', encoding='utf-8') as f:
+                log_data = json.load(f)
+
+            for record in log_data.get("downloads", []):
+                if record.get("shortcode") == shortcode:
+                    return record.get("blogger_name") or "unknown"
+
+            return "unknown"
+        except Exception as e:
+            self.logger.warning(f"获取作者ID失败 {video_path}: {e}")
+            return "unknown"
+
+    def build_chapter_list(self, video_files: List[str]) -> str:
+        """为合并视频列表生成时间轴章节文本，格式：MM:SS  author_id"""
+        lines = []
+        cumulative_seconds = 0.0
+
+        for video_path in video_files:
+            total_secs = int(cumulative_seconds)
+            hours = total_secs // 3600
+            minutes = (total_secs % 3600) // 60
+            seconds = total_secs % 60
+
+            if hours > 0:
+                timestamp = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            else:
+                timestamp = f"{minutes:02d}:{seconds:02d}"
+
+            author_id = self.get_author_id_for_video(video_path)
+            lines.append(f"{timestamp}  {author_id}")
+
+            duration = self.get_video_duration(video_path)
+            cumulative_seconds += duration
+
+        return "\n".join(lines)
+
     def get_latest_videos(self, directory: str, count: int = 8) -> List[str]:
         """获取最新的N个视频文件"""
         video_files = glob.glob(os.path.join(directory, "*.mp4"))
@@ -516,17 +579,20 @@ class VideoMerger:
         # 使用终极标准化合并（包含所有功能）
         self.logger.info("🎯 使用终极标准化合并模式")
         self.logger.info("📋 包含功能: 统一分辨率(黑边) + AAC音频 + 时间戳修复 + 参数标准化")
-        
-        # 生成一个临时合并文件用于终极标准化
-        temp_merge_path = output_path.replace('.mp4', '_temp.mp4')
-        
+
+        # 提前生成章节列表（用原始视频时长，精度足够）
+        self.logger.info("📋 生成章节列表...")
+        chapter_list = self.build_chapter_list(merge_videos)
+        if chapter_list:
+            self.logger.info(f"章节列表:\n{chapter_list}")
+
         # 先使用终极标准化合并
         success = self.merge_videos_with_standardization(merge_videos, output_path)
-        
+
         # 执行合并
         if success:
-            # **关键改进：记录已合并的视频**
-            self.add_merged_videos(merge_videos, output_path)
+            # **关键改进：记录已合并的视频（含章节列表）**
+            self.add_merged_videos(merge_videos, output_path, chapter_list)
             return {"merged": 1, "skipped": skipped_count, "failed": 0}
         else:
             return {"merged": 0, "skipped": skipped_count, "failed": 1}

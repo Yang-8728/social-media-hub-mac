@@ -41,7 +41,7 @@ class BilibiliUploader(IUploader):
                 return False
             
             # 窗口设置
-            chrome_options.add_argument("--window-size=1200,800")
+            chrome_options.add_argument("--window-size=1400,900")
             chrome_options.add_argument("--window-position=100,100")
             
             # 稳定性选项 - 修复启动崩溃问题
@@ -94,7 +94,7 @@ class BilibiliUploader(IUploader):
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1200,800")
+            chrome_options.add_argument("--window-size=1400,900")
             chrome_options.add_argument("--remote-debugging-port=9223")  # 使用不同端口
             
             print("� 尝试不使用配置文件启动Chrome...")
@@ -235,15 +235,20 @@ class BilibiliUploader(IUploader):
             
             # 1. 填写标题（快速处理）
             self._set_title(video_path)
-            
-            # 2. 根据账户决定是否设置分区
+
+            # 2. 填写简介（章节列表）
+            chapter_list = self._get_chapter_list_for_video(video_path)
+            self._chapter_list = chapter_list  # 上传成功后发评论用
+            self._set_description(chapter_list)
+
+            # 4. 根据账户决定是否设置分区
             if self.account_name == "aigf8728":
                 print("ℹ️ aigf8728账户跳过分区设置，请在页面手动选择分区")
             else:
                 # ai_vanvan等其他账户自动设置分区
                 self._set_category_fast(category, subcategory)
-            
-            # 3. 等待并点击立即投稿
+
+            # 5. 等待并点击立即投稿
             return self._submit_and_wait_success()
             
         except Exception as e:
@@ -269,11 +274,364 @@ class BilibiliUploader(IUploader):
                     self.driver.quit()
             return False
     
+    def _get_chapter_list_for_video(self, video_path: str) -> str:
+        """从合并记录中读取该视频对应的章节列表"""
+        try:
+            import json
+            merged_record_file = os.path.join("logs", "merges", f"{self.account_name}_merged_record.json")
+            if not os.path.exists(merged_record_file):
+                return ""
+
+            with open(merged_record_file, 'r', encoding='utf-8') as f:
+                record = json.load(f)
+
+            abs_video_path = os.path.abspath(video_path)
+            for merge_info in reversed(record.get("merged_videos", [])):
+                if os.path.abspath(merge_info.get("output_file", "")) == abs_video_path:
+                    return merge_info.get("chapter_list", "")
+
+            return ""
+        except Exception as e:
+            print(f"⚠️ 读取章节列表失败: {e}")
+            return ""
+
+    def _set_description(self, description: str):
+        """设置视频简介（章节列表）"""
+        if not description:
+            return
+        try:
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+
+            # B站简介框是 Quill 富文本编辑器（class='ql-editor'），不是 textarea
+            desc_elem = None
+            try:
+                # 找面积最大的可见 contenteditable 元素（即简介框）
+                desc_elem = self.driver.execute_script("""
+                    var els = document.querySelectorAll('[contenteditable="true"]');
+                    var best = null, bestArea = 0;
+                    els.forEach(function(el) {
+                        var rect = el.getBoundingClientRect();
+                        var area = rect.width * rect.height;
+                        if (rect.width > 0 && rect.height > 0 && area > bestArea) {
+                            bestArea = area;
+                            best = el;
+                        }
+                    });
+                    return best;
+                """)
+            except Exception:
+                pass
+
+            if desc_elem:
+                self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", desc_elem)
+                desc_elem.click()
+                time.sleep(0.3)
+                # 先清空
+                self.driver.execute_script("arguments[0].innerText = '';", desc_elem)
+                self.driver.execute_script(
+                    "arguments[0].dispatchEvent(new Event('input', {bubbles: true}));", desc_elem
+                )
+                time.sleep(0.2)
+                # 用 Shift+Enter 输入软换行（不会产生空行段落）
+                lines = description.split("\n")
+                for i, line in enumerate(lines):
+                    desc_elem.send_keys(line)
+                    if i < len(lines) - 1:
+                        desc_elem.send_keys(Keys.SHIFT + Keys.RETURN)
+                print(f"📝 简介已设置（章节列表）")
+            else:
+                print("⚠️ 未找到简介输入框，跳过")
+        except Exception as e:
+            print(f"⚠️ 设置简介失败: {e}")
+
+    def _wait_review_then_comment(self, chapter_list: str):
+        """跳到稿件管理页，等刚上传的视频出现且审核通过后发评论+置顶"""
+        try:
+            # 用上传时记录的标题（序号增加前存的），避免读到已+1的序号
+            video_title = getattr(self, '_upload_title', None) or self._generate_title_preview()
+            print(f"📋 跳转到稿件管理页面，等待「{video_title}」审核通过...")
+            self.driver.get("https://member.bilibili.com/platform/upload-manager/article")
+            time.sleep(5)
+
+            # 最多等 2 小时，每 10 秒检查一次（720次 × 10秒 = 2小时）
+            for attempt in range(720):
+                try:
+                    if attempt > 0:
+                        self.driver.refresh()
+                        time.sleep(4)
+
+                    body_text = self.driver.find_element(By.TAG_NAME, "body").text
+                    print(f"⏳ 第{attempt+1}次检查（每10秒）...")
+
+                    # 判断1：目标视频是否已出现在稿件管理页面
+                    if video_title not in body_text:
+                        print(f"  视频「{video_title}」还未出现在稿件管理（仍在进行中），继续等待...")
+                        time.sleep(10)
+                        continue
+
+                    # 判断2：视频已出现，检查状态
+                    if "审核不通过" in body_text:
+                        print(f"❌ 视频「{video_title}」审核不通过！请检查内容后手动重新提交。")
+                        return
+
+                    if "审核中" in body_text:
+                        print(f"  视频「{video_title}」已出现，状态：审核中，等待通过...")
+                        time.sleep(10)
+                        continue
+
+                    # 判断3：无"审核中"也无"审核不通过" → 已通过，可以发评论
+                    print(f"✅ 「{video_title}」审核通过！准备点击视频发评论...")
+
+                    # 找到该视频对应的链接并点击
+                    try:
+                        video_link = self.driver.find_element(
+                            By.XPATH,
+                            f"//p[contains(text(),'{video_title}')]/ancestor::div[contains(@class,'video') or contains(@class,'item') or contains(@class,'card')][1]//a[contains(@href,'/video/BV') or contains(@href,'bilibili.com/video')]"
+                        )
+                    except Exception:
+                        # 备选：找页面上第一个 BV 链接（此时第一个就是刚通过的视频）
+                        video_link = self.driver.find_element(
+                            By.XPATH,
+                            "//a[contains(@href, '/video/BV') or contains(@href, 'bilibili.com/video')]"
+                        )
+
+                    # 取 href 直接导航，避免新标签问题
+                    href = video_link.get_attribute("href")
+                    if href and not href.startswith("http"):
+                        href = "https://www.bilibili.com" + href
+                    print(f"  跳转到视频页: {href}")
+                    self.driver.get(href)
+                    time.sleep(6)
+                    self._post_chapter_comment(chapter_list)
+                    return
+
+                except Exception as e:
+                    print(f"⚠️ 检查状态出错: {e}，10秒后继续...")
+                    time.sleep(10)
+
+            print("⏰ 等待超时（2小时），跳过评论")
+
+        except Exception as e:
+            print(f"⚠️ 等待审核流程出错: {e}")
+
+    def _post_chapter_comment(self, chapter_list: str):
+        """在当前视频页发章节列表评论并置顶"""
+        try:
+            print("💬 开始发评论...")
+
+            # 滚动到评论区（触发懒加载）
+            for scroll_pos in [400, 800, 1200, 1800, 2500]:
+                self.driver.execute_script(f"window.scrollTo(0, {scroll_pos});")
+                time.sleep(0.8)
+            time.sleep(3)
+
+            # 在 shadow DOM 里递归找评论输入框（contenteditable 或 textarea）
+            comment_box = self.driver.execute_script("""
+                function findDeep(root) {
+                    var ta = root.querySelector('textarea');
+                    if (ta && ta.getBoundingClientRect().width > 0) return ta;
+                    var ce = root.querySelector('[contenteditable="true"]');
+                    if (ce && ce.getBoundingClientRect().width > 0) return ce;
+                    var all = root.querySelectorAll('*');
+                    for (var el of all) {
+                        if (el.shadowRoot) {
+                            var found = findDeep(el.shadowRoot);
+                            if (found) return found;
+                        }
+                    }
+                    return null;
+                }
+                return findDeep(document);
+            """)
+
+            if not comment_box:
+                print("⚠️ 未找到评论输入框，跳过")
+                return
+
+            self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", comment_box)
+            comment_box.click()
+            time.sleep(0.5)
+
+            # 输入章节列表（Shift+Enter 软换行）
+            lines = chapter_list.split("\n")
+            for i, line in enumerate(lines):
+                comment_box.send_keys(line)
+                if i < len(lines) - 1:
+                    comment_box.send_keys(Keys.SHIFT + Keys.RETURN)
+            time.sleep(0.5)
+
+            # 找发送按钮（在 shadow DOM 里）并用 JS click
+            send_btn = self.driver.execute_script("""
+                function findBtn(root) {
+                    var btns = root.querySelectorAll('button');
+                    for (var btn of btns) {
+                        var txt = btn.textContent.trim();
+                        if (txt === '发布' || txt === '发送') return btn;
+                    }
+                    var all = root.querySelectorAll('*');
+                    for (var el of all) {
+                        if (el.shadowRoot) {
+                            var found = findBtn(el.shadowRoot);
+                            if (found) return found;
+                        }
+                    }
+                    return null;
+                }
+                return findBtn(document);
+            """)
+            if not send_btn:
+                print("⚠️ 找不到发送按钮，跳过")
+                return
+            self.driver.execute_script("arguments[0].click()", send_btn)
+            print("✅ 评论已发送")
+            time.sleep(3)
+
+            # 置顶：hover 评论内容区 → 找「...」按钮 → W3C 坐标点击 → 点「设为置顶」
+            try:
+                # 找 BILI-COMMENT-RENDERER
+                renderer = self.driver.execute_script("""
+                    function findRenderer(root) {
+                        var el = root.querySelector('bili-comment-renderer');
+                        if (el) return el;
+                        var all = root.querySelectorAll('*');
+                        for (var item of all) {
+                            if (item.shadowRoot) {
+                                var f = findRenderer(item.shadowRoot);
+                                if (f) return f;
+                            }
+                        }
+                        return null;
+                    }
+                    return findRenderer(document);
+                """)
+                if not renderer:
+                    print("⚠️ 找不到评论元素，跳过置顶")
+                    return
+
+                # 找内容区 DIV（宽度 > 700）并 hover
+                content_div = self.driver.execute_script("""
+                    function findRenderer(root) {
+                        var el = root.querySelector('bili-comment-renderer');
+                        if (el) return el;
+                        var all = root.querySelectorAll('*');
+                        for (var item of all) {
+                            if (item.shadowRoot) { var f = findRenderer(item.shadowRoot); if (f) return f; }
+                        }
+                        return null;
+                    }
+                    var renderer = findRenderer(document);
+                    if (!renderer || !renderer.shadowRoot) return null;
+                    var best = null, bestArea = 0;
+                    renderer.shadowRoot.querySelectorAll('div').forEach(function(el) {
+                        var rect = el.getBoundingClientRect();
+                        var area = rect.width * rect.height;
+                        if (rect.width > 700 && rect.height > 100 && area < 897 * 444 && area > bestArea) {
+                            bestArea = area; best = el;
+                        }
+                    });
+                    return best || renderer;
+                """)
+                target = content_div if content_div else renderer
+                self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", target)
+                time.sleep(0.5)
+                self.driver.execute_script("window.scrollBy(0, 150);")
+                time.sleep(0.5)
+                ActionChains(self.driver).move_to_element(target).perform()
+                time.sleep(1.5)
+
+                # 在 renderer shadow DOM 里找最右边的小型无文字元素（「...」按钮）
+                more_btn = self.driver.execute_script("""
+                    function findRenderer(root) {
+                        var el = root.querySelector('bili-comment-renderer');
+                        if (el) return el;
+                        var all = root.querySelectorAll('*');
+                        for (var item of all) {
+                            if (item.shadowRoot) { var f = findRenderer(item.shadowRoot); if (f) return f; }
+                        }
+                        return null;
+                    }
+                    function findAllSmall(root, depth, results) {
+                        if (depth > 5) return;
+                        root.querySelectorAll('*').forEach(function(el) {
+                            var tag = (el.tagName || '').toLowerCase();
+                            var rect = el.getBoundingClientRect();
+                            var txt = el.textContent.trim();
+                            if (rect.width > 0 && rect.width < 40 && rect.height > 0 && rect.height < 40 && txt === '') {
+                                if (tag === 'button' || tag === 'div' || tag === 'span') {
+                                    results.push({el: el, x: rect.x});
+                                }
+                            }
+                            if (el.shadowRoot) findAllSmall(el.shadowRoot, depth + 1, results);
+                        });
+                    }
+                    var renderer = findRenderer(document);
+                    if (!renderer || !renderer.shadowRoot) return null;
+                    var items = [];
+                    findAllSmall(renderer.shadowRoot, 0, items);
+                    if (!items.length) return null;
+                    items.sort(function(a, b) { return b.x - a.x; });
+                    return items[0].el;
+                """)
+
+                if not more_btn:
+                    print("⚠️ 找不到「...」按钮，跳过置顶")
+                    return
+
+                # 用 W3C Actions 按精确坐标点击
+                rect = self.driver.execute_script("return arguments[0].getBoundingClientRect()", more_btn)
+                cx = int(rect['x'] + rect['width'] / 2)
+                cy = int(rect['y'] + rect['height'] / 2)
+                actions = ActionChains(self.driver)
+                actions.w3c_actions.pointer_action.move_to_location(cx, cy)
+                actions.w3c_actions.pointer_action.click()
+                actions.perform()
+                time.sleep(2)
+
+                # 找「设为置顶」选项（精确文字匹配 + 最小面积，避免点到「删除」）
+                pin_btn = self.driver.execute_script("""
+                    var best = null, bestArea = Infinity;
+                    function search(root) {
+                        root.querySelectorAll('*').forEach(function(el) {
+                            var txt = el.textContent.trim();
+                            if (txt === '设为置顶' || txt === '置顶') {
+                                var rect = el.getBoundingClientRect();
+                                if (rect.width > 0 && rect.height > 0) {
+                                    var area = rect.width * rect.height;
+                                    if (area < bestArea) { bestArea = area; best = el; }
+                                }
+                            }
+                            if (el.shadowRoot) search(el.shadowRoot);
+                        });
+                    }
+                    search(document);
+                    return best;
+                """)
+                if pin_btn:
+                    pin_rect = self.driver.execute_script("return arguments[0].getBoundingClientRect()", pin_btn)
+                    px = int(pin_rect['x'] + pin_rect['width'] / 2)
+                    py = int(pin_rect['y'] + pin_rect['height'] / 2)
+                    pin_actions = ActionChains(self.driver)
+                    pin_actions.w3c_actions.pointer_action.move_to_location(px, py)
+                    pin_actions.w3c_actions.pointer_action.click()
+                    pin_actions.perform()
+                    time.sleep(1)
+                    print("✅ 评论已置顶")
+                else:
+                    print("⚠️ 找不到「设为置顶」选项，但评论已发送")
+
+            except Exception as e:
+                print(f"⚠️ 置顶失败: {e}，但评论已发送")
+
+        except Exception as e:
+            print(f"⚠️ 发评论出错: {e}")
+
     def _set_title(self, video_path: str):
         """智能设置标题 - 使用ins海外利大谱#序号格式"""
         try:
             title_input = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder*='标题'], input[placeholder*='请填写标题']"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder*='请输入稿件标题'], input[placeholder*='标题'], input[placeholder*='请填写标题']"))
             )
             
             # 强力清空输入框
@@ -285,7 +643,9 @@ class BilibiliUploader(IUploader):
             title = self._generate_title_preview(video_path)
             title_input.send_keys(title)
             print(f"📝 标题已设置: {title}")
-            
+
+            # 保存标题供审核等待时精确查找（序号增加前就记录好）
+            self._upload_title = title
             # 保存当前使用的序号（用于失败时回退）
             self.current_episode_number = self._get_current_episode_number()
         except:
@@ -772,13 +1132,18 @@ class BilibiliUploader(IUploader):
                     print(f"⚠️ 截图保存失败: {e}")
                     
                 print("✅ 稿件投递成功！")
-                
+
                 # 上传成功后才增加序号
                 self._increment_episode_number()
-                
-                # 上传成功后关闭浏览器（所有账户）
-                print("🎉 上传成功！3秒后关闭浏览器...")
-                time.sleep(3)
+
+                # 去稿件管理页等审核通过后发评论
+                chapter_list = getattr(self, '_chapter_list', '')
+                if chapter_list:
+                    self._wait_review_then_comment(chapter_list)
+                else:
+                    print("⚠️ 无章节列表，跳过评论")
+
+                print("🎉 全部完成，关闭浏览器...")
                 if hasattr(self, 'driver') and self.driver:
                     self.driver.quit()
                     print("✅ 浏览器已关闭")

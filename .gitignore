@@ -94,3 +94,12 @@ config/secrets/
 test_results/
 download_results_*.json
 ip_test_result.json
+
+# Chrome profile cache (auto-generated, no need to track)
+tools/profiles/*/Default/Cache/
+tools/profiles/*/Default/BrowsingTopicsState
+tools/profiles/*/Default/Code Cache/
+tools/profiles/*/Default/GPUCache/
+tools/profiles/*/Default/Service Worker/
+tools/profiles/*/Singleton*
+tools/profiles/*/DevToolsActivePort
