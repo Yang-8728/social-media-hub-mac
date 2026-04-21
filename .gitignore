@@ -95,15 +95,13 @@ test_results/
 download_results_*.json
 ip_test_result.json
 
-# Chrome profile - exclude everything except login data
-tools/profiles/*/
-!tools/profiles/*/Default/
-!tools/profiles/*/Default/Cookies
-!tools/profiles/*/Default/Cookies-journal
-!tools/profiles/*/Default/Login Data
-!tools/profiles/*/Default/Login Data For Account
-!tools/profiles/*/Default/Web Data
-!tools/profiles/*/Default/Preferences
-!tools/profiles/*/Default/Secure Preferences
-!tools/profiles/*/Default/Network/
-!tools/profiles/*/Default/Network/Cookies
+# Chrome profile - ignore entirely
+tools/profiles/
+
+# Sensitive runtime files
+bili_cookies_ai_vanvan.json
+bili_monitor_state.json
+temp/ai_vanvan_session*
+
+# Custom spam keywords (user-specific, keep local)
+spam_keywords_custom.json

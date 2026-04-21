@@ -203,7 +203,7 @@ class VideoMerger:
         """使用ffprobe获取视频时长（秒）"""
         try:
             cmd = [
-                "ffprobe",
+                "/opt/homebrew/bin/ffprobe",
                 "-v", "quiet",
                 "-show_entries", "format=duration",
                 "-of", "csv=p=0",
@@ -243,7 +243,7 @@ class VideoMerger:
         cumulative_seconds = 0.0
 
         for video_path in video_files:
-            total_secs = int(cumulative_seconds)
+            total_secs = round(cumulative_seconds)
             hours = total_secs // 3600
             minutes = (total_secs % 3600) // 60
             seconds = total_secs % 60
@@ -273,7 +273,7 @@ class VideoMerger:
     def get_video_resolution(self, video_path: str) -> tuple:
         """获取视频分辨率"""
         try:
-            ffprobe_exe = "ffprobe"
+            ffprobe_exe = "/opt/homebrew/bin/ffprobe"
             cmd = [
                 ffprobe_exe,
                 "-v", "quiet",
@@ -325,8 +325,8 @@ class VideoMerger:
     def ultimate_video_standardization(self, input_path: str, output_path: str, target_width: int, target_height: int) -> bool:
         """终极视频标准化：修复所有问题并统一参数"""
         try:
-            ffmpeg_exe = "ffmpeg"
-            
+            ffmpeg_exe = "/opt/homebrew/bin/ffmpeg"
+
             # 终极修复命令
             cmd = [
                 ffmpeg_exe,
@@ -447,19 +447,7 @@ class VideoMerger:
                     f.write(f"file '{abs_path}'\n")
             
             # 检查FFmpeg
-            ffmpeg_paths = [
-                os.path.join("tools", "ffmpeg", "bin", "ffmpeg.exe"),
-                "ffmpeg"
-            ]
-            
-            ffmpeg_exe = None
-            for path in ffmpeg_paths:
-                if os.path.exists(path):
-                    ffmpeg_exe = path
-                    break
-            
-            if not ffmpeg_exe:
-                ffmpeg_exe = "ffmpeg"
+            ffmpeg_exe = "/opt/homebrew/bin/ffmpeg"
             
             # FFmpeg合并命令
             cmd = [

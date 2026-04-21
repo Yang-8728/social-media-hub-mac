@@ -239,7 +239,12 @@ class BilibiliUploader(IUploader):
             # 2. 填写简介（章节列表）
             chapter_list = self._get_chapter_list_for_video(video_path)
             self._chapter_list = chapter_list  # 上传成功后发评论用
-            self._set_description(chapter_list)
+            quark_header = (
+                "知道你们爱看啥，私信发ID可拿合集，长按复制打开夸克浏览器即可，\n"
+                "链接：https://pan.quark.cn/s/043ad3cbb949"
+            )
+            desc_with_quark = quark_header + "\n————————————————\n" + chapter_list if chapter_list else quark_header
+            self._set_description(desc_with_quark)
 
             # 4. 根据账户决定是否设置分区
             if self.account_name == "aigf8728":
@@ -294,6 +299,20 @@ class BilibiliUploader(IUploader):
         except Exception as e:
             print(f"⚠️ 读取章节列表失败: {e}")
             return ""
+
+    def _save_cookies(self):
+        """把当前 driver 的 B站 Cookie 保存到 JSON，供 bili_monitor 使用"""
+        try:
+            import json as _json
+            cookies = self.driver.get_cookies()
+            result = {c["name"]: c["value"] for c in cookies if "bilibili" in c.get("domain", "")}
+            out = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__)))), f"bili_cookies_{self.account_name}.json")
+            with open(out, "w") as f:
+                _json.dump(result, f, indent=2)
+            print(f"✅ Cookie 已保存: {out}")
+        except Exception as e:
+            print(f"⚠️ 保存 Cookie 失败: {e}")
 
     def _set_description(self, description: str):
         """设置视频简介（章节列表）"""
@@ -418,6 +437,11 @@ class BilibiliUploader(IUploader):
 
     def _post_chapter_comment(self, chapter_list: str):
         """在当前视频页发章节列表评论并置顶"""
+        quark_header = (
+            "知道你们爱看啥，私信发ID可拿合集，长按复制打开夸克浏览器即可，\n"
+            "链接：https://pan.quark.cn/s/043ad3cbb949"
+        )
+        chapter_list = quark_header + "\n————————————————\n" + chapter_list if chapter_list else quark_header
         try:
             print("💬 开始发评论...")
 
@@ -1144,6 +1168,7 @@ class BilibiliUploader(IUploader):
                     print("⚠️ 无章节列表，跳过评论")
 
                 print("🎉 全部完成，关闭浏览器...")
+                self._save_cookies()
                 if hasattr(self, 'driver') and self.driver:
                     self.driver.quit()
                     print("✅ 浏览器已关闭")
