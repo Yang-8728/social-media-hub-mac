@@ -62,7 +62,10 @@ def save_state(state):
 def api_get(session, url, params=None):
     try:
         r = session.get(url, params=params, timeout=10)
-        return r.json()
+        data = r.json()
+        if data.get("code") == -101:  # 账号未登录
+            return {"code": -101, "error": "cookie_expired"}
+        return data
     except Exception as e:
         return {"error": str(e)}
 
@@ -77,7 +80,11 @@ def fetch_new_replies(session, last_cursor):
     r = api_get(session, "https://api.bilibili.com/x/msgfeed/reply",
                 params={"platform": "web", "build": 0, "mobi_app": "web"})
 
-    if not r or r.get("code") != 0:
+    if not r:
+        return [], last_cursor
+    if r.get("code") == -101:
+        return [{"error": "cookie_expired"}], last_cursor
+    if r.get("code") != 0:
         return [], last_cursor
 
     items = (r.get("data") or {}).get("items") or []
@@ -203,6 +210,8 @@ def poll():
     all_new = []
 
     replies, new_reply_cursor = fetch_new_replies(session, state["last_reply_cursor"])
+    if replies and replies[0].get("error") == "cookie_expired":
+        return [{"type": "error", "content": "⚠️ B站Cookie已过期，请在Mac上运行：python3 export_bili_cookies.py"}]
     all_new.extend(replies)
     state["last_reply_cursor"] = new_reply_cursor
 

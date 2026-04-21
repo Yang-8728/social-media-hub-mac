@@ -227,8 +227,8 @@ def _process_items(items):
                             ok = _delete_comment(_oid, _rpid)
                             _blacklist_user(_uid) if ok and _uid else None
                             if ok:
-                                add_keyword(_content[:30])
-                                tg.send(f"✅ 已删除＋已拉黑，关键词「{_content[:30]}」已加入词库")
+                                add_keyword(_content)
+                                tg.send(f"✅ 已删除＋已拉黑，关键词「{_content[:50]}」已加入词库")
                             else:
                                 tg.send("❌ 删除失败")
                         else:
