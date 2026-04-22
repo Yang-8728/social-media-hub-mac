@@ -114,15 +114,21 @@ def main():
                             threading.Thread(target=_do_reply, daemon=True).start()
                         elif target["type"] == "dm":
                             uid, uname = target["uid"], target["uname"]
-                            def _do_dm(t=text, u=uid, n=uname):
-                                from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
-                                try:
-                                    sess = get_bilibili_session()
-                                    ok = send_dm(sess, get_csrf(sess), int(u), t)
-                                    tg.send(f"✅ 私信已发给 {n}" if ok else "❌ 发送失败")
-                                except Exception as e:
-                                    tg.send(f"❌ 发送失败: {e}")
-                            threading.Thread(target=_do_dm, daemon=True).start()
+                            if text.startswith("/share "):
+                                ig_user = text.split()[1]
+                                safe_uname = uname.replace(" ", "_")
+                                t_arg = f"dm:{uid}:{safe_uname}"
+                                threading.Thread(target=quark_share.run, args=(ig_user, t_arg), daemon=True).start()
+                            else:
+                                def _do_dm(t=text, u=uid, n=uname):
+                                    from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
+                                    try:
+                                        sess = get_bilibili_session()
+                                        ok = send_dm(sess, get_csrf(sess), int(u), t)
+                                        tg.send(f"✅ 私信已发给 {n}" if ok else "❌ 发送失败")
+                                    except Exception as e:
+                                        tg.send(f"❌ 发送失败: {e}")
+                                threading.Thread(target=_do_dm, daemon=True).start()
                         # 如果 queue 正在等待（不确定评论 ask），顺带解锁
                         if iq.has_pending():
                             iq.resolve("0")
