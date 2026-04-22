@@ -334,18 +334,10 @@ def _process_items(items, offline_prefix=""):
             bvid  = item.get("bvid", "")
             ok    = _delete_comment(oid, rpid) if oid and rpid else False
             bl    = _blacklist_user(uid) if ok and uid else False
-            status = "已删除" + ("＋已拉黑" if bl else "") if ok else "删除失败"
             comment_url = f"https://www.bilibili.com/video/{bvid}?comment_root_id={rpid}" if bvid and rpid else ""
-            msg = (
-                f"🗑️ 自动删除垃圾评论\n"
-                f"👤 {tg.esc(uname)}\n"
-                f"🏷️ {tg.esc(spam_reason)}\n"
-                f"📝 {tg.esc(content[:80])}\n"
-                f"{'✅' if ok else '❌'} {status}"
-            )
-            if comment_url:
-                msg += f"\n🔗 {tg.link('查看评论', comment_url)}"
-            tg.send_md(msg)
+            icon = "🗑️" if ok else "❌"
+            link = f" {tg.link('查看', comment_url)}" if comment_url else ""
+            tg.send_md(f"{icon} {tg.esc(uname)}{link}")
 
         elif uncertain_reason and is_comment and not offline_prefix:
             oid2        = item.get("oid")
