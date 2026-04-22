@@ -123,6 +123,9 @@ def main():
                                 except Exception as e:
                                     tg.send(f"❌ 发送失败: {e}")
                             threading.Thread(target=_do_dm, daemon=True).start()
+                        # 如果 queue 正在等待（不确定评论 ask），顺带解锁
+                        if iq.has_pending():
+                            iq.resolve("0")
                         continue
                     else:
                         tg.send("⚠️ 找不到对应的评论/私信目标，可能已超出记录范围")

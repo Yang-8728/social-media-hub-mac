@@ -304,8 +304,8 @@ class BilibiliUploader:
             import json as _json
             cookies = self.driver.get_cookies()
             result = {c["name"]: c["value"] for c in cookies if "bilibili" in c.get("domain", "")}
-            out = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-                os.path.abspath(__file__)))), f"bili_cookies_{self.account_name}.json")
+            out = os.path.join(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__))), "temp", f"bili_cookies_{self.account_name}.json")
             with open(out, "w") as f:
                 _json.dump(result, f, indent=2)
             print(f"✅ Cookie 已保存: {out}")
@@ -381,6 +381,9 @@ class BilibiliUploader:
 
                     body_text = self.driver.find_element(By.TAG_NAME, "body").text
                     print(f"⏳ 第{attempt+1}次检查（每10秒）...")
+                    if attempt % 30 == 0 and attempt > 0:
+                        mins = attempt * 10 // 60
+                        print(f"🕐 审核等待中（已等约 {mins} 分钟）...")
 
                     # 判断1：目标视频是否已出现在稿件管理页面
                     if video_title not in body_text:
@@ -435,11 +438,8 @@ class BilibiliUploader:
 
     def _post_chapter_comment(self, chapter_list: str):
         """在当前视频页发章节列表评论并置顶"""
-        quark_header = (
-            "知道你们爱看啥，私信发ID可拿合集，长按复制打开夸克浏览器即可，\n"
-            "链接：https://pan.quark.cn/s/043ad3cbb949"
-        )
-        chapter_list = quark_header + "\n————————————————\n" + chapter_list if chapter_list else quark_header
+        header = "知道你们爱看啥，发私信带ID就可以拿合集哦"
+        chapter_list = header + "\n————————————————\n" + chapter_list if chapter_list else header
         try:
             print("💬 开始发评论...")
 
@@ -507,8 +507,34 @@ class BilibiliUploader:
                 print("⚠️ 找不到发送按钮，跳过")
                 return
             self.driver.execute_script("arguments[0].click()", send_btn)
-            print("✅ 评论已发送")
             time.sleep(3)
+
+            # 检测违规 toast
+            blocked = self.driver.execute_script("""
+                var keywords = ['违规', '不符合', '内容涉及', '发送失败', '审核'];
+                function search(root) {
+                    var all = root.querySelectorAll('*');
+                    for (var el of all) {
+                        var txt = el.textContent.trim();
+                        if (txt.length < 30) {
+                            for (var kw of keywords) {
+                                if (txt.indexOf(kw) !== -1) return txt;
+                            }
+                        }
+                        if (el.shadowRoot) {
+                            var r = search(el.shadowRoot);
+                            if (r) return r;
+                        }
+                    }
+                    return null;
+                }
+                return search(document);
+            """)
+            if blocked:
+                print(f"❌ 评论被拦截：{blocked}")
+                print("⚠️ COMMENT_BLOCKED")
+                return
+            print("✅ 评论已发送")
 
             # 置顶：hover 评论内容区 → 找「...」按钮 → W3C 坐标点击 → 点「设为置顶」
             try:

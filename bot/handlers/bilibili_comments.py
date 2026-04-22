@@ -314,14 +314,23 @@ def _process_items(items, offline_prefix=""):
             tg.send_md(msg)
 
         elif uncertain_reason and is_comment and not offline_prefix:
-            msg = _format_fan(item)
-            if not msg:
-                continue
-            oid2   = item.get("oid")
-            rpid2  = item.get("rpid")
-            uid2   = item.get("uid")
-            ask_msg = (msg + f"\n⚠️ _{tg.esc(uncertain_reason)}，判断不了_"
-                       f"\n\n❓ 垃圾？1 删除\\+拉黑\\+加词库，0 跳过，Reply 直接回复")
+            oid2        = item.get("oid")
+            rpid2       = item.get("rpid")
+            uid2        = item.get("uid")
+            raw_uname   = item.get("uname", "?")
+            raw_title   = item.get("video_title", "")[:40]
+            raw_content = item.get("content", "")[:120]
+            bvid2       = item.get("bvid", "")
+            comment_url2 = (f"https://www.bilibili.com/video/{bvid2}?comment_root_id={rpid2}"
+                            if bvid2 and rpid2 else "")
+            plain = f"💬 {raw_uname} 评论了你的视频"
+            if raw_title:
+                plain += f"\n🎬 《{raw_title}》"
+            plain += f"\n📝 {raw_content}"
+            if comment_url2:
+                plain += f"\n🔗 {comment_url2}"
+            ask_msg = (plain + f"\n\n⚠️ {uncertain_reason}，判断不了"
+                       f"\n❓ 垃圾？1 删除+拉黑+加词库，0 跳过，Reply 直接回复")
             ev = threading.Event()
             def _unc_cb(ans, _oid=oid2, _rpid=rpid2, _uid=uid2, _content=content, _ev=ev):
                 ans = ans.strip()
@@ -330,7 +339,7 @@ def _process_items(items, offline_prefix=""):
                     _blacklist_user(_uid) if ok and _uid else None
                     if ok:
                         add_keyword(_content)
-                        tg.send(f"✅ 已删除＋已拉黑，关键词「{_content[:50]}」已加入词库")
+                        tg.send(f"✅ 已删除+已拉黑，关键词「{_content[:50]}」已加入词库")
                     else:
                         tg.send("❌ 删除失败")
                 else:
@@ -358,29 +367,10 @@ def _process_items(items, offline_prefix=""):
 
             elif item.get("type") == "dm" and not offline_prefix:
                 dm_uid   = item.get("uid")
-                dm_uname = tg.esc(item.get("uname", str(dm_uid)))
-                ask_msg  = msg + f"\n\n💬 回复 *{dm_uname}*？输入内容或 0 跳过"
-                ev = threading.Event()
-                def _dm_cb(ans, _uid=dm_uid, _ev=ev):
-                    ans = ans.strip()
-                    if ans and ans != "0":
-                        from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
-                        try:
-                            sess = get_bilibili_session()
-                            csrf = get_csrf(sess)
-                            ok = send_dm(sess, csrf, int(_uid), ans)
-                            tg.send("✅ 私信已发送" if ok else "❌ 发送失败")
-                        except Exception as e:
-                            tg.send(f"❌ 发送失败: {e}")
-                    else:
-                        tg.send("⏭ 已跳过")
-                    _ev.set()
-                _dm_uid2, _dm_uname2 = dm_uid, item.get("uname", str(dm_uid))
-                def _dm_on_sent(mid, _u=_dm_uid2, _n=_dm_uname2):
-                    register_dm_target(mid, _u, _n)
-                iq.push(ask_msg, _dm_cb, on_sent=_dm_on_sent)
-                ev.wait()
-                ev.clear()
+                dm_uname = item.get("uname", str(dm_uid))
+                mid = tg.send_md(msg + "\n\n_💬 直接回复此消息即可发送私信_")
+                if mid and dm_uid:
+                    register_dm_target(mid, dm_uid, dm_uname)
 
             else:
                 tg.send_md(prefix_md + msg)

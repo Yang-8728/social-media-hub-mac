@@ -54,6 +54,16 @@ def run():
         elif "评论已置顶" in line:
             if "cm" not in step_sent:
                 step_sent.add("cm"); tg.send_md("📌 章节评论已发布并置顶\\!")
+        elif "COMMENT_BLOCKED" in line:
+            if "cb" not in step_sent:
+                step_sent.add("cb"); tg.send("⚠️ 章节评论被B站拦截（内容违规），请手动发评论")
+        elif "审核等待中" in line:
+            m2 = re.search(r'已等约 (\d+) 分钟', line)
+            if m2:
+                tg.send(f"⏳ 视频仍在审核中，已等待约 {m2.group(1)} 分钟…")
+        elif "审核不通过" in line:
+            if "nr" not in step_sent:
+                step_sent.add("nr"); tg.send("❌ 视频审核不通过！请手动检查稿件内容")
 
     try:
         for line in proc.stdout:
@@ -81,8 +91,10 @@ def run():
         upload_status = "✅ 成功"
     elif any(x in output for x in ("没有新的视频需要合并", "无需上传", "跳过上传", "发现 0 个新视频")):
         upload_status = "⏭ 跳过（无新视频）"
+    elif "审核不通过" in output:
+        upload_status = "❌ 审核不通过"
     elif any(x in output for x in ("上传失败", "❌ 上传失败")):
-        upload_status = "❌ 失败"
+        upload_status = "❌ 上传失败"
     else:
         upload_status = "❓ 未知"
 
@@ -98,7 +110,8 @@ def run():
             duration = _get_video_duration(full_path)
 
     comment_status = ("✅ 已发布并置顶" if "评论已置顶" in output
-                      else ("✅ 已发布" if "评论已发送" in output else "—"))
+                      else ("✅ 已发布" if "评论已发送" in output
+                      else ("❌ 被拦截（内容违规）" if "COMMENT_BLOCKED" in output else "—")))
 
     tg.send_md(
         f"*ai\\_vanvan 流程完成*\n\n"
