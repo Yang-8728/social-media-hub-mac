@@ -114,11 +114,14 @@ def main():
                             threading.Thread(target=_do_reply, daemon=True).start()
                         elif target["type"] == "dm":
                             uid, uname = target["uid"], target["uname"]
-                            if text.strip() == "/share" and target.get("ig"):
-                                ig_user = target["ig"]
-                                safe_uname = uname.replace(" ", "_")
-                                t_arg = f"dm:{uid}:{safe_uname}"
-                                threading.Thread(target=quark_share.run, args=(ig_user, t_arg), daemon=True).start()
+                            if text.strip() == "/share":
+                                ig_user = target.get("ig")
+                                if ig_user:
+                                    safe_uname = uname.replace(" ", "_")
+                                    t_arg = f"dm:{uid}:{safe_uname}"
+                                    threading.Thread(target=quark_share.run, args=(ig_user, t_arg), daemon=True).start()
+                                else:
+                                    tg.send("⚠️ 未找到IG账号，等粉丝发含IG账号的消息后再试")
                             else:
                                 def _do_dm(t=text, u=uid, n=uname):
                                     from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
