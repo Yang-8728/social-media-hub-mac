@@ -34,7 +34,8 @@ SPAM_KEYWORDS = [
     "浏览记录",
 ]
 
-URL_RE = re.compile(r'https?://\S+|b23\.tv/\S*|BV[a-zA-Z0-9]{10}', re.IGNORECASE)
+URL_RE    = re.compile(r'https?://\S+|b23\.tv/\S*|BV[a-zA-Z0-9]{10}', re.IGNORECASE)
+_B23_RE   = re.compile(r'b23\.tv/', re.IGNORECASE)
 _IMG_RE = re.compile(r'\[[^\[\]]{3,}\]')
 
 # ── 文件路径 ──────────────────────────────────────────────────────────────────
@@ -134,6 +135,8 @@ def _save_pending(item: dict):
 # ── 垃圾检测 ──────────────────────────────────────────────────────────────────
 
 def _is_spam(text: str) -> str | None:
+    if _B23_RE.search(text):
+        return "含b23.tv链接"
     for kw in SPAM_KEYWORDS + _load_custom_keywords():
         if kw in text:
             return f"关键词: {kw}"
