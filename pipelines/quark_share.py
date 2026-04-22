@@ -183,9 +183,13 @@ def run(ig_username: str, target: str = None):
         tg.send(f"❌ 下载出错：{e}")
         return
 
-    uid = target[3:] if target and target.startswith("dm:") else None
+    fan_label = None
+    if target and target.startswith("dm:"):
+        parts = target[3:].split(":", 1)
+        uid_val = parts[0]
+        fan_label = parts[1].replace("_", " ") if len(parts) > 1 else uid_val
     try:
-        zip_path = _zip_videos(video_paths, ig_username, uid=uid)
+        zip_path = _zip_videos(video_paths, ig_username, uid=fan_label)
     except Exception as e:
         tg.send(f"❌ 打包失败：{e}")
         return
@@ -210,8 +214,7 @@ def run(ig_username: str, target: str = None):
 
     if target:
         if target.startswith("dm:"):
-            uid = target[3:]
-            _send_dm_reply(uid, ig_username, share_url)
+            _send_dm_reply(uid_val, ig_username, share_url)
         else:
             rpid = target
             context = _lookup_pending(rpid)

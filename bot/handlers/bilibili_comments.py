@@ -258,7 +258,8 @@ def _format_fan(item: dict) -> str | None:
         ig_names = _extract_ig_from_history(history)
         if ig_names:
             msg += f"\n\n🔍 检测到 IG 账号：`{tg.esc(ig_names[0])}`\n"
-            msg += f"👉 `/share {tg.esc(ig_names[0])} dm:{uid}`"
+            safe_uname = uname.replace(" ", "_")
+            msg += f"👉 `/share {tg.esc(ig_names[0])} dm:{uid}:{safe_uname}`"
         return msg
 
     elif t == "error":
