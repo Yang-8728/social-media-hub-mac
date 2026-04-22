@@ -154,6 +154,66 @@ def fetch_new_at(session, last_cursor):
 
 # ── 拉取新私信 ─────────────────────────────────────────────────────────────────
 
+def _fetch_uname(session, uid: int) -> str:
+    r = api_get(session, "https://api.bilibili.com/x/web-interface/card",
+                params={"mid": uid})
+    return ((r.get("data") or {}).get("card") or {}).get("name", str(uid))
+
+
+def _fetch_dm_history(session, talker_id: int, size: int = 5) -> list:
+    """返回最近几条消息，每条 {"from_me": bool, "text": str}"""
+    r = api_get(session, "https://api.vc.bilibili.com/svr_sync/v1/svr_sync/fetch_session_msgs",
+                params={"talker_id": talker_id, "session_type": 1, "size": size})
+    messages = (r.get("data") or {}).get("messages") or []
+    try:
+        my_uid = int(session.cookies.get("DedeUserID", domain=".bilibili.com") or 0)
+    except Exception:
+        my_uid = None
+    result = []
+    for m in reversed(messages):  # 最新的排最后
+        if m.get("msg_type") != 1:
+            continue
+        try:
+            text = json.loads(m.get("content", "{}")).get("content", "")
+        except Exception:
+            text = ""
+        if text:
+            from_me = (m.get("sender_uid") == my_uid)
+            result.append({"from_me": from_me, "text": text})
+    return result
+
+
+def send_dm(session, csrf: str, receiver_uid: int, message: str) -> bool:
+    """向指定 B站用户发送私信"""
+    my_uid = None
+    # 从 cookie 里拿自己的 UID
+    try:
+        my_uid = int(session.cookies.get("DedeUserID", domain=".bilibili.com") or 0)
+    except Exception:
+        pass
+    try:
+        r = session.post(
+            "https://api.vc.bilibili.com/web_im/v1/web_im/send_msg",
+            data={
+                "msg[sender_uid]":       str(my_uid or ""),
+                "msg[receiver_id]":      str(receiver_uid),
+                "msg[receiver_type]":    "1",
+                "msg[msg_type]":         "1",
+                "msg[msg_status]":       "0",
+                "msg[content]":          json.dumps({"content": message}),
+                "msg[timestamp]":        str(int(time.time())),
+                "msg[new_face_version]": "0",
+                "msg[dev_id]":           "A0E97B93-D44A-4FC5-9C55-E8F3CA4A7BD3",
+                "csrf":                  csrf,
+                "csrf_token":            csrf,
+            },
+            timeout=10,
+        )
+        return r.json().get("code") == 0
+    except Exception:
+        return False
+
+
 def fetch_new_dm(session, last_session_ts):
     r = api_get(session, "https://api.vc.bilibili.com/session_svr/v1/session_svr/get_sessions",
                 params={"session_type": 1, "group_fold": 1, "unread_fold": 0,
@@ -175,19 +235,23 @@ def fetch_new_dm(session, last_session_ts):
             continue
 
         new_ts = max(new_ts, ts)
-        sender = s.get("sender_uid", "")
+        talker_id = s.get("talker_id") or last_msg.get("sender_uid", 0)
         content = ""
         try:
-            msg_content = json.loads(last_msg.get("content", "{}"))
-            content = msg_content.get("content", "")
+            content = json.loads(last_msg.get("content", "{}")).get("content", "")
         except Exception:
             pass
 
+        uname = _fetch_uname(session, talker_id)
+        history = _fetch_dm_history(session, talker_id, size=10)
+
         results.append({
             "type":    "dm",
-            "uname":   str(sender),
+            "uid":     talker_id,
+            "uname":   uname,
             "content": content,
             "unread":  unread,
+            "history": history,
         })
 
     return results, new_ts

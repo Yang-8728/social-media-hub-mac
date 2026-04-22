@@ -50,24 +50,19 @@
   "youtube": {
     "name": "youtube",
     "platform": "youtube",
-    "username": "你的YouTube用户名",
     "folder_strategy": "daily",
-    "title_prefix": "洋了二正#",
-    "youtube_api": {
-      "client_id": "YOUR_GOOGLE_CLIENT_ID",
-      "client_secret": "YOUR_GOOGLE_CLIENT_SECRET"
-    },
-    "bilibili": {
-      "profile_name": "youtube_gaoxiao_profile",
-      "chrome_profile_path": "/Users/yanglan/Code/social-media-hub/tools/profiles/chrome_profile_youtube"
-    },
-    "upload_settings": {
-      "title_pattern": "洋了二正#{序号}",
-      "next_number": 1
-    },
     "download_safety": {
       "max_posts_per_session": 50,
       "request_delay": 5
+    }
+  },
+  "wechat": {
+    "name": "wechat",
+    "platform": "wechat",
+    "chrome_profile": "chrome_profile_wechat",
+    "upload_settings": {
+      "max_title_length": 80,
+      "upload_timeout": 600
     }
   }
 }

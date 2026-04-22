@@ -105,3 +105,12 @@ temp/ai_vanvan_session*
 
 # Custom spam keywords (user-specific, keep local)
 spam_keywords_custom.json
+
+# Pending comment contexts for /share command
+pending_comments.json
+
+# Reply targets mapping (persisted across restarts)
+reply_targets.json
+
+# Quark download temp directory
+temp/quark_downloads/

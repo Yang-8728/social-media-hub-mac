@@ -7,12 +7,19 @@ import os
 import json
 import time
 
-from src.core.models import Account
-from src.platforms.instagram.downloader import InstagramDownloader
-from src.platforms.bilibili.uploader import BilibiliUploader
-from src.utils.logger import Logger
-from src.utils.video_merger import VideoMerger
-from src.utils.folder_manager import FolderManager
+from platforms.instagram.downloader import InstagramDownloader
+from platforms.bilibili.uploader import BilibiliUploader
+from platforms.instagram.logger import Logger
+from platforms.bilibili.merger import VideoMerger
+from platforms.instagram.folder_manager import FolderManager
+
+
+class Account:
+    def __init__(self, name: str, platform: str, username: str):
+        self.name = name
+        self.platform = platform
+        self.username = username
+        self.config = {}
 
 
 def load_environment_config():
