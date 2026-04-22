@@ -212,27 +212,36 @@ def _scan_sub_replies(oid, rpid) -> str | None:
     return "\n".join(lines)
 
 
+def _get_scan_oids() -> list[str]:
+    """从 pending_comments.json 收集近期活跃视频的 OID，去重后返回。"""
+    oids = []
+    try:
+        data = json.load(open(PENDING_FILE))
+        seen = set()
+        for item in data.values():
+            oid = str(item.get("oid", ""))
+            if oid and oid not in seen:
+                seen.add(oid)
+                oids.append(oid)
+    except Exception:
+        pass
+    return oids[:SCAN_VIDEOS]
+
+
 def _full_scan(label="定期"):
-    """主动扫描近期视频的所有评论+楼中楼，自动删除垃圾，TG 汇报统计。"""
+    """主动扫描近期活跃视频的所有评论+楼中楼，自动删除垃圾，TG 汇报统计。"""
     session, _ = _get_session()
     if not session:
         return
     my_uid = _get_my_uid()
 
-    try:
-        r = session.get(
-            "https://api.bilibili.com/x/space/arc/search",
-            params={"mid": my_uid, "ps": SCAN_VIDEOS, "pn": 1, "tid": 0, "order": "pubdate"},
-            timeout=10,
-        )
-        videos = ((r.json().get("data") or {}).get("list") or {}).get("vlist") or []
-    except Exception as e:
-        print(f"[bilibili_comments] 全量扫描获取视频列表失败: {e}", flush=True)
+    oids = _get_scan_oids()
+    if not oids:
+        print(f"[bilibili_comments] {label}扫描：无活跃视频 OID，跳过", flush=True)
         return
 
     deleted = failed = 0
-    for video in videos:
-        aid = str(video.get("aid", ""))
+    for aid in oids:
         if not aid:
             continue
         pn = 1
