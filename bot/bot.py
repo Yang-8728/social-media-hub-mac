@@ -171,7 +171,8 @@ def main():
                     if url:
                         threading.Thread(target=wechat_pipeline.run, args=(url,), daemon=True).start()
                     else:
-                        tg.send("用法：/wechat <YouTube URL>\n示例：/wechat https://youtube.com/watch?v=xxx")
+                        threading.Thread(target=wechat_pipeline.run_liked, daemon=True).start()
+
 
                 elif text.startswith("/share "):
                     parts = text.split()
@@ -199,7 +200,8 @@ def main():
                         "/auto_clean — 自动删除所有垃圾评论\n"
                         "/addspam 关键词 — 添加自定义垃圾词\n"
                         "/share ig用户名 [rpid] — 下载IG合集打包上传夸克并回复粉丝\n"
-                        "/wechat <YouTube URL> — 下载并上传到微信视频号\n"
+                        "/wechat — 取最新点赞 Short 上传微信视频号\n"
+                        "/wechat <YouTube URL> — 指定视频上传微信视频号\n"
                         "/help — 显示此帮助"
                     )
 

@@ -67,5 +67,24 @@ class YouTubeDownloader:
 
         return os.path.join(BASE_DIR, "singles")
 
+    def fetch_latest_liked_short(self) -> str | None:
+        """从 YouTube 点赞列表获取最新一个 Short 的 URL（需 Chrome 已登录 YouTube）"""
+        cmd = [
+            YT_DLP,
+            "--cookies-from-browser", "chrome",
+            "--flat-playlist",
+            "--playlist-end", "30",
+            "--print", "webpage_url",
+            "--no-warnings",
+            "https://www.youtube.com/playlist?list=LL",
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = proc.communicate()
+        for url in stdout.splitlines():
+            url = url.strip()
+            if "/shorts/" in url:
+                return url
+        return None
+
     def _is_playlist(self, url: str) -> bool:
         return "list=" in url
