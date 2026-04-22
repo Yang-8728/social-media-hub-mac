@@ -166,6 +166,48 @@ def _get_session():
     csrf = cookies.get("bili_jct", "")
     return session, csrf
 
+def _get_my_uid() -> str:
+    try:
+        cookies = json.load(open(COOKIE_FILE))
+        return str(cookies.get("DedeUserID", ""))
+    except Exception:
+        return ""
+
+
+def _scan_sub_replies(oid, rpid) -> str | None:
+    """检查某条评论的子回复，自动删除垃圾，返回通知文本（无垃圾则返回 None）"""
+    session, _ = _get_session()
+    if not session:
+        return None
+    try:
+        subs = bili_monitor.fetch_sub_replies(session, oid, rpid)
+    except Exception:
+        return None
+    if not subs:
+        return None
+
+    my_uid = _get_my_uid()
+    deleted, failed = [], []
+    for sub in subs:
+        if str(sub["uid"]) == my_uid:
+            continue
+        reason = _is_spam(sub["content"])
+        if not reason:
+            continue
+        ok = _delete_comment(oid, sub["rpid"])
+        _blacklist_user(sub["uid"]) if ok and sub["uid"] else None
+        if ok:
+            deleted.append(f"👤 {tg.esc(sub['uname'])}：{tg.esc(sub['content'][:50])}")
+        else:
+            failed.append(sub["uname"])
+
+    if not deleted and not failed:
+        return None
+    lines = [f"🧹 楼中楼清理：删除 {len(deleted)} 条" + (f"，失败 {len(failed)} 条" if failed else "")]
+    lines.extend(deleted)
+    return "\n".join(lines)
+
+
 def _delete_comment(oid, rpid) -> bool:
     session, csrf = _get_session()
     if not session or not csrf:
@@ -346,6 +388,9 @@ def _process_items(items, offline_prefix=""):
             if comment_url:
                 msg += f"\n🔗 {tg.link('查看评论', comment_url)}"
             tg.send_md(msg, no_preview=True)
+            sub_msg = _scan_sub_replies(oid, rpid)
+            if sub_msg:
+                tg.send_md(sub_msg)
 
         elif uncertain_reason and is_comment and not offline_prefix:
             oid2        = item.get("oid")
@@ -385,6 +430,9 @@ def _process_items(items, offline_prefix=""):
             iq.push(ask_msg, _unc_cb, on_sent=_on_sent)
             ev.wait()
             ev.clear()
+            sub_msg = _scan_sub_replies(oid2, rpid2)
+            if sub_msg:
+                tg.send_md(sub_msg)
 
         else:
             msg = _format_fan(item)
@@ -398,6 +446,9 @@ def _process_items(items, offline_prefix=""):
                 mid = tg.send_md(prefix_md + msg)
                 if mid and oid2 and rpid2:
                     register_reply_target(mid, oid2, rpid2, item.get("uname", ""))
+                sub_msg = _scan_sub_replies(oid2, rpid2)
+                if sub_msg:
+                    tg.send_md(sub_msg)
 
             elif item.get("type") == "dm" and not offline_prefix:
                 dm_uid   = item.get("uid")

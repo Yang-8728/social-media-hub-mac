@@ -153,6 +153,34 @@ def fetch_new_at(session, last_cursor):
 
 # ── 拉取新私信 ─────────────────────────────────────────────────────────────────
 
+def fetch_sub_replies(session, oid: int, rpid: int) -> list:
+    """拉取某条评论的所有子回复，每条格式：{rpid, uid, uname, content}"""
+    results, pn = [], 1
+    while True:
+        r = api_get(session, "https://api.bilibili.com/x/v2/reply/reply",
+                    params={"oid": oid, "type": 1, "root": rpid, "ps": 20, "pn": pn})
+        if not r or r.get("code") != 0:
+            break
+        replies = ((r.get("data") or {}).get("replies")) or []
+        if not replies:
+            break
+        for rep in replies:
+            member  = rep.get("member") or {}
+            content = (rep.get("content") or {}).get("message", "")
+            results.append({
+                "rpid":    rep.get("rpid", 0),
+                "uid":     member.get("mid", ""),
+                "uname":   member.get("uname", "?"),
+                "content": content,
+            })
+        cursor = (r.get("data") or {}).get("cursor") or {}
+        if cursor.get("is_end", True):
+            break
+        pn += 1
+        time.sleep(0.2)
+    return results
+
+
 def fetch_comment_has_images(session, oid: int, rpid: int) -> bool:
     """检查评论是否含图片附件（通知 API 的 source_content 不含此信息）"""
     r = api_get(session, "https://api.bilibili.com/x/v2/reply/info",
