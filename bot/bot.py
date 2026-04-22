@@ -115,13 +115,22 @@ def main():
                         elif target["type"] == "dm":
                             uid, uname = target["uid"], target["uname"]
                             if text.strip() == "/share":
-                                ig_user = target.get("ig")
-                                if ig_user:
-                                    safe_uname = uname.replace(" ", "_")
-                                    t_arg = f"dm:{uid}:{safe_uname}"
-                                    threading.Thread(target=quark_share.run, args=(ig_user, t_arg), daemon=True).start()
-                                else:
-                                    tg.send("⚠️ 未找到IG账号，等粉丝发含IG账号的消息后再试")
+                                def _do_share(u=uid, n=uname):
+                                    from platforms.bilibili.monitor import get_bilibili_session, _fetch_dm_history
+                                    from bot.handlers.bilibili_comments import _extract_ig_from_history
+                                    try:
+                                        sess = get_bilibili_session()
+                                        history = _fetch_dm_history(sess, int(u), size=20)
+                                        ig_names = _extract_ig_from_history(history)
+                                        if not ig_names:
+                                            tg.send("⚠️ 未在私信历史中找到IG账号")
+                                            return
+                                        safe_uname = n.replace(" ", "_")
+                                        t_arg = f"dm:{u}:{safe_uname}"
+                                        quark_share.run(ig_names[0], t_arg)
+                                    except Exception as e:
+                                        tg.send(f"❌ /share 出错: {e}")
+                                threading.Thread(target=_do_share, daemon=True).start()
                             else:
                                 def _do_dm(t=text, u=uid, n=uname):
                                     from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
