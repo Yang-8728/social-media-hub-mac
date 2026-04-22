@@ -11,8 +11,8 @@ from bot import tg_client as tg
 from platforms.quark.api import QuarkClient
 
 PROJECT_DIR   = Path(__file__).resolve().parents[1]
-COOKIE_FILE   = PROJECT_DIR / "bili_cookies_ai_vanvan.json"
-PENDING_FILE  = PROJECT_DIR / "pending_comments.json"
+COOKIE_FILE   = PROJECT_DIR / "temp" / "bili_cookies_ai_vanvan.json"
+PENDING_FILE  = PROJECT_DIR / "temp" / "pending_comments.json"
 DOWNLOAD_DIR  = PROJECT_DIR / "temp" / "quark_downloads"
 SESSION_FILE  = str(PROJECT_DIR / "temp" / "ai_vanvan_session")
 

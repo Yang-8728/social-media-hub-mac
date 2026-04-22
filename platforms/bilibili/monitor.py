@@ -1,22 +1,21 @@
 """
 B站通知监控模块
-从 Chrome Profile 读取 Cookie，轮询 B站通知 API，返回新消息列表
-供 telegram-bot/bot.py 调用
+从 Cookie 文件轮询 B站通知 API，返回新消息列表。
 """
 import os, json, time, requests
 from pathlib import Path
 
 ACCOUNT_NAME = "ai_vanvan"
-STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                          "bili_monitor_state.json")
+_PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+STATE_FILE = os.path.join(_PROJECT_DIR, "temp", "bili_monitor_state.json")
 
 PROFILE_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
+    _PROJECT_DIR,
     "tools", "profiles", f"chrome_profile_{ACCOUNT_NAME}", "Default"
 )
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            f"bili_cookies_{ACCOUNT_NAME}.json")
+COOKIE_FILE = os.path.join(_PROJECT_DIR, "temp", f"bili_cookies_{ACCOUNT_NAME}.json")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

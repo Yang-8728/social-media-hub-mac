@@ -6,7 +6,7 @@ import os, re, sys, time, json, threading, requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-import bili_monitor
+from platforms.bilibili import monitor as bili_monitor
 from bot import tg_client as tg
 from bot import interaction_queue as iq
 
@@ -40,10 +40,10 @@ _IMG_RE = re.compile(r'\[[^\[\]]{3,}\]')
 # ── 文件路径 ──────────────────────────────────────────────────────────────────
 
 PROJECT_DIR        = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-COOKIE_FILE        = os.path.join(PROJECT_DIR, "bili_cookies_ai_vanvan.json")
-CUSTOM_KW_FILE     = os.path.join(PROJECT_DIR, "spam_keywords_custom.json")
-REPLY_TARGETS_FILE = os.path.join(PROJECT_DIR, "reply_targets.json")
-PENDING_FILE       = os.path.join(PROJECT_DIR, "pending_comments.json")
+COOKIE_FILE        = os.path.join(PROJECT_DIR, "temp", "bili_cookies_ai_vanvan.json")
+CUSTOM_KW_FILE     = os.path.join(PROJECT_DIR, "config", "spam_keywords_custom.json")
+REPLY_TARGETS_FILE = os.path.join(PROJECT_DIR, "temp", "reply_targets.json")
+PENDING_FILE       = os.path.join(PROJECT_DIR, "temp", "pending_comments.json")
 
 ACCOUNT_NAME = "ai_vanvan"
 MAX_VIDEOS   = 3
@@ -364,7 +364,7 @@ def _process_items(items, offline_prefix=""):
                 def _dm_cb(ans, _uid=dm_uid, _ev=ev):
                     ans = ans.strip()
                     if ans and ans != "0":
-                        from bili_monitor import send_dm, get_bilibili_session, get_csrf
+                        from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
                         try:
                             sess = get_bilibili_session()
                             csrf = get_csrf(sess)

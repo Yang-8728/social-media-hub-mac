@@ -115,7 +115,7 @@ def main():
                         elif target["type"] == "dm":
                             uid, uname = target["uid"], target["uname"]
                             def _do_dm(t=text, u=uid, n=uname):
-                                from bili_monitor import send_dm, get_bilibili_session, get_csrf
+                                from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
                                 try:
                                     sess = get_bilibili_session()
                                     ok = send_dm(sess, get_csrf(sess), int(u), t)
