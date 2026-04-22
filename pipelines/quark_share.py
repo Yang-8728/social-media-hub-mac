@@ -84,9 +84,10 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
 
 # ── 打包 ──────────────────────────────────────────────────────────────────────
 
-def _zip_videos(video_paths: list, ig_username: str) -> str:
+def _zip_videos(video_paths: list, ig_username: str, uid: str = None) -> str:
     date_str = datetime.now().strftime("%Y%m%d")
-    zip_path = str(PROJECT_DIR / "temp" / f"{ig_username}_{date_str}.zip")
+    name = f"{ig_username}_{uid}_{date_str}" if uid else f"{ig_username}_{date_str}"
+    zip_path = str(PROJECT_DIR / "temp" / f"{name}.zip")
     tg.send(f"📦 正在打包 {len(video_paths)} 个视频...")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
         for vp in video_paths:
@@ -182,8 +183,9 @@ def run(ig_username: str, target: str = None):
         tg.send(f"❌ 下载出错：{e}")
         return
 
+    uid = target[3:] if target and target.startswith("dm:") else None
     try:
-        zip_path = _zip_videos(video_paths, ig_username)
+        zip_path = _zip_videos(video_paths, ig_username, uid=uid)
     except Exception as e:
         tg.send(f"❌ 打包失败：{e}")
         return
