@@ -13,7 +13,7 @@ from platforms.quark.api import QuarkClient
 PROJECT_DIR   = Path(__file__).resolve().parents[1]
 COOKIE_FILE   = PROJECT_DIR / "temp" / "bili_cookies_ai_vanvan.json"
 PENDING_FILE  = PROJECT_DIR / "temp" / "pending_comments.json"
-DOWNLOAD_DIR  = PROJECT_DIR / "temp" / "quark_downloads"
+DOWNLOAD_DIR  = PROJECT_DIR / "videos" / "quark"
 SESSION_FILE  = str(PROJECT_DIR / "temp" / "ai_vanvan_session")
 
 SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
