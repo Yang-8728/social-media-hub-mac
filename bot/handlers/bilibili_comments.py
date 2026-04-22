@@ -48,9 +48,11 @@ CUSTOM_KW_FILE     = os.path.join(PROJECT_DIR, "config", "spam_keywords_custom.j
 REPLY_TARGETS_FILE = os.path.join(PROJECT_DIR, "temp", "reply_targets.json")
 PENDING_FILE       = os.path.join(PROJECT_DIR, "temp", "pending_comments.json")
 
-ACCOUNT_NAME = "ai_vanvan"
-MAX_VIDEOS   = 3
-INTERVAL     = 30
+ACCOUNT_NAME  = "ai_vanvan"
+MAX_VIDEOS    = 3
+INTERVAL      = 30
+SCAN_INTERVAL = 7200  # 全量扫描间隔（秒），2小时
+SCAN_VIDEOS   = 5     # 每次扫最近几个视频
 MAX_REPLY_TARGETS = 200
 
 # ── 自定义关键词 ──────────────────────────────────────────────────────────────
@@ -210,6 +212,82 @@ def _scan_sub_replies(oid, rpid) -> str | None:
     return "\n".join(lines)
 
 
+def _full_scan(label="定期"):
+    """主动扫描近期视频的所有评论+楼中楼，自动删除垃圾，TG 汇报统计。"""
+    session, _ = _get_session()
+    if not session:
+        return
+    my_uid = _get_my_uid()
+
+    try:
+        r = session.get(
+            "https://api.bilibili.com/x/space/arc/search",
+            params={"mid": my_uid, "ps": SCAN_VIDEOS, "pn": 1, "tid": 0, "order": "pubdate"},
+            timeout=10,
+        )
+        videos = ((r.json().get("data") or {}).get("list") or {}).get("vlist") or []
+    except Exception as e:
+        print(f"[bilibili_comments] 全量扫描获取视频列表失败: {e}", flush=True)
+        return
+
+    deleted = failed = 0
+    for video in videos:
+        aid = str(video.get("aid", ""))
+        if not aid:
+            continue
+        pn = 1
+        while True:
+            try:
+                r = session.get(
+                    "https://api.bilibili.com/x/v2/reply",
+                    params={"oid": aid, "type": 1, "pn": pn, "ps": 20, "sort": 0},
+                    timeout=10,
+                )
+                data  = r.json().get("data") or {}
+                replies = data.get("replies") or []
+            except Exception:
+                break
+            if not replies:
+                break
+
+            for reply in replies:
+                member = reply.get("member") or {}
+                uid    = str(member.get("mid", ""))
+                rpid   = reply.get("rpid", 0)
+                text   = (reply.get("content") or {}).get("message", "")
+                if uid != my_uid and _is_spam(text):
+                    ok = _delete_comment(aid, rpid)
+                    _blacklist_user(uid) if ok and uid else None
+                    deleted += 1 if ok else 0
+                    failed  += 0 if ok else 1
+
+                if reply.get("rcount", 0) > 0:
+                    try:
+                        subs = bili_monitor.fetch_sub_replies(session, aid, rpid)
+                        for sub in subs:
+                            if str(sub["uid"]) == my_uid:
+                                continue
+                            if _is_spam(sub["content"]):
+                                ok = _delete_comment(aid, sub["rpid"])
+                                _blacklist_user(sub["uid"]) if ok and sub["uid"] else None
+                                deleted += 1 if ok else 0
+                                failed  += 0 if ok else 1
+                    except Exception:
+                        pass
+                time.sleep(0.1)
+
+            page = data.get("page") or {}
+            if pn * 20 >= page.get("count", 0):
+                break
+            pn += 1
+            time.sleep(0.3)
+
+    summary = f"🔍 {label}扫描完成：删除 {deleted} 条垃圾评论" + (f"，失败 {failed} 条" if failed else "")
+    print(f"[bilibili_comments] {summary}", flush=True)
+    if deleted or failed:
+        tg.send(summary)
+
+
 def _delete_comment(oid, rpid) -> bool:
     session, csrf = _get_session()
     if not session or not csrf:
@@ -328,6 +406,10 @@ def run():
         print(f"[bilibili_comments] 发现 {len(backlog)} 条积压通知，开始处理", flush=True)
         _process_items(backlog, offline_prefix="[离线期间] ")
 
+    # 启动时立即做一次全量扫描
+    threading.Thread(target=_full_scan, args=("启动",), daemon=True).start()
+
+    last_scan = time.time()
     while True:
         try:
             items = bili_monitor.poll()
@@ -338,6 +420,11 @@ def run():
                     _process_items(items)
         except Exception as e:
             print(f"[bilibili_comments] 异常: {e}", flush=True)
+
+        if time.time() - last_scan >= SCAN_INTERVAL:
+            last_scan = time.time()
+            threading.Thread(target=_full_scan, args=("定期",), daemon=True).start()
+
         time.sleep(INTERVAL)
 
 
