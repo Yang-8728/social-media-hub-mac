@@ -114,8 +114,8 @@ def main():
                             threading.Thread(target=_do_reply, daemon=True).start()
                         elif target["type"] == "dm":
                             uid, uname = target["uid"], target["uname"]
-                            if text.startswith("/share "):
-                                ig_user = text.split()[1]
+                            if text.strip() == "/share" and target.get("ig"):
+                                ig_user = target["ig"]
                                 safe_uname = uname.replace(" ", "_")
                                 t_arg = f"dm:{uid}:{safe_uname}"
                                 threading.Thread(target=quark_share.run, args=(ig_user, t_arg), daemon=True).start()

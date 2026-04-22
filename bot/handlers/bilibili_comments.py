@@ -94,8 +94,8 @@ def register_reply_target(msg_id: int, oid, rpid, uname: str):
         del _reply_targets[next(iter(_reply_targets))]
     _save_reply_targets(_reply_targets)
 
-def register_dm_target(msg_id: int, uid, uname: str):
-    _reply_targets[msg_id] = {"type": "dm", "uid": uid, "uname": uname}
+def register_dm_target(msg_id: int, uid, uname: str, ig_username: str = None):
+    _reply_targets[msg_id] = {"type": "dm", "uid": uid, "uname": uname, "ig": ig_username}
     if len(_reply_targets) > MAX_REPLY_TARGETS:
         del _reply_targets[next(iter(_reply_targets))]
     _save_reply_targets(_reply_targets)
@@ -258,7 +258,7 @@ def _format_fan(item: dict) -> str | None:
         ig_names = _extract_ig_from_history(history)
         if ig_names:
             msg += f"\n\n🔍 检测到 IG 账号：`{tg.esc(ig_names[0])}`\n"
-            msg += f"👉 回复此消息发送 `/share {tg.esc(ig_names[0])}`"
+            msg += f"👉 回复此消息发送 `/share`"
         return msg
 
     elif t == "error":
@@ -399,9 +399,11 @@ def _process_items(items, offline_prefix=""):
             elif item.get("type") == "dm" and not offline_prefix:
                 dm_uid   = item.get("uid")
                 dm_uname = item.get("uname", str(dm_uid))
+                ig_names = _extract_ig_from_history(item.get("history", []))
+                ig_detected = ig_names[0] if ig_names else None
                 mid = tg.send_md(msg + "\n\n_💬 直接回复此消息即可发送私信_")
                 if mid and dm_uid:
-                    register_dm_target(mid, dm_uid, dm_uname)
+                    register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)
 
             else:
                 tg.send_md(prefix_md + msg)
