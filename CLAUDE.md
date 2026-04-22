@@ -57,6 +57,42 @@ social-media-hub/
 - `pipelines/` 是跨平台串联层
 - 哪怕两个平台有相似逻辑，也各自实现
 
+## 测试
+
+### 工具
+- pytest（`brew install pytest` 安装，用 `pytest` 命令运行）
+- 测试文件放 `tests/`，`tests/conftest.py` 负责把项目根目录加入 `sys.path`
+
+### 运行
+```bash
+pytest tests/                        # 跑全部
+pytest tests/test_quark_share.py -v  # 跑单个文件
+```
+
+### 测试策略
+涉及外部 API（Instagram、夸克、B站）的模块用 mock 测试，不真实请求：
+- `patch.object(module, "func", return_value=...)` — 替换函数返回值
+- `patch.object(module, "func", side_effect=SomeError)` — 模拟异常，测错误处理
+- `patch.object(module.tg, "send")` — 拦截 TG 消息，验证发送内容
+
+新 pipeline 写完后必须在 `tests/` 里补对应的 mock 测试。
+
+### 已发现的 bug（测试过程中）
+
+**#5 `_zip_videos` 未确保 `temp/` 目录存在**
+- 位置：`pipelines/quark_share.py` → `_zip_videos`
+- 问题：直接写到 `PROJECT_DIR/temp/`，若目录缺失直接 FileNotFoundError
+- 修复：开头加 `(PROJECT_DIR / "temp").mkdir(exist_ok=True)`
+
+**mock 写法陷阱（非 bug，供参考）**
+- `patch("os.path.exists", return_value=True)` 会全局生效，导致 `out_path.exists()` 也返回 True，文件未下载就走缓存路径
+- 正确写法：用 `side_effect` 只拦截特定路径：
+  ```python
+  def exists_side_effect(path):
+      return str(path) == str(qs.SESSION_FILE)
+  patch("os.path.exists", side_effect=exists_side_effect)
+  ```
+
 ## Bot 运行
 
 - LaunchAgent 自动启动：`com.yanglan.telegrambot.plist`
