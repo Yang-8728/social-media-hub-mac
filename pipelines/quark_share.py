@@ -145,7 +145,29 @@ def _lookup_pending(rpid: str) -> dict:
 
 # ── 主流程 ────────────────────────────────────────────────────────────────────
 
-def run(ig_username: str, rpid: str = None):
+def _send_dm_reply(uid: str, ig_username: str, share_url: str):
+    """通过 B站私信把夸克链接发给粉丝"""
+    from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
+    try:
+        sess = get_bilibili_session()
+        csrf = get_csrf(sess)
+        msg = f"你好！这是 @{ig_username} 的视频合集（7天有效）：{share_url}"
+        ok = send_dm(sess, csrf, int(uid), msg)
+        if ok:
+            tg.send(f"✅ 已通过私信发送链接给 UID {uid}")
+        else:
+            tg.send(f"⚠️ 私信发送失败（链接已生成）")
+    except Exception as e:
+        tg.send(f"⚠️ 私信发送出错：{e}（链接已生成）")
+
+
+def run(ig_username: str, target: str = None):
+    """
+    target 格式：
+      dm:<uid>  → 回复 B站私信
+      <rpid>    → 回复 B站评论
+      None      → 不自动回复
+    """
     tg.send(f"🚀 开始处理 @{ig_username} 的合集分享请求...")
 
     try:
@@ -184,20 +206,21 @@ def run(ig_username: str, rpid: str = None):
         tg.send(f"❌ 创建分享链接失败：{e}")
         return
 
-    bili_reply_ok = False
-    if rpid:
-        context = _lookup_pending(rpid)
-        oid = context.get("oid")
-        if oid:
-            reply_msg = f"你好！这是 @{ig_username} 的视频合集（7天有效）：{share_url}"
-            bili_reply_ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
-            if bili_reply_ok:
-                fan_uname = context.get("uname", "粉丝")
-                tg.send(f"✅ 已在 B站回复 {fan_uname}")
-            else:
-                tg.send("⚠️ B站回复失败（继续，链接已生成）")
+    if target:
+        if target.startswith("dm:"):
+            uid = target[3:]
+            _send_dm_reply(uid, ig_username, share_url)
         else:
-            tg.send(f"⚠️ 未找到 rpid={rpid} 的评论上下文，跳过 B站回复")
+            rpid = target
+            context = _lookup_pending(rpid)
+            oid = context.get("oid")
+            if oid:
+                reply_msg = f"你好！这是 @{ig_username} 的视频合集（7天有效）：{share_url}"
+                ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
+                fan_uname = context.get("uname", "粉丝")
+                tg.send(f"✅ 已在 B站回复 {fan_uname}" if ok else "⚠️ B站回复失败（继续，链接已生成）")
+            else:
+                tg.send(f"⚠️ 未找到 rpid={rpid} 的评论上下文，跳过回复")
 
     tg.send(
         f"✅ 分享完成！\n"
