@@ -189,7 +189,11 @@ def main():
                     tg.send("未知命令，发送 /help 查看可用命令。")
 
         except Exception as e:
-            print(f"[{time.strftime('%H:%M:%S')}] Error: {e}", flush=True)
+            err = str(e)
+            if "ProxyError" in err or "SSLError" in err or "ConnectionError" in err:
+                print(f"[{time.strftime('%H:%M:%S')}] 网络波动，5秒后重试", flush=True)
+            else:
+                print(f"[{time.strftime('%H:%M:%S')}] Error: {e}", flush=True)
             time.sleep(5)
 
 
