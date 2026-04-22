@@ -272,6 +272,12 @@ class QuarkClient:
         if not share_id:
             raise RuntimeError(f"创建分享失败: {resp}")
 
-        url = f"https://pan.quark.cn/s/{share_id}"
-        print(f"[quark] 分享链接: {url}")
-        return url
+        detail = self._get("/1/clouddrive/share/mypage/detail",
+                           params={"share_id": share_id})
+        items = (detail.get("data") or {}).get("list") or []
+        share_url = items[0].get("share_url") if items else None
+        if not share_url:
+            share_url = f"https://pan.quark.cn/s/{share_id}"
+
+        print(f"[quark] 分享链接: {share_url}")
+        return share_url
