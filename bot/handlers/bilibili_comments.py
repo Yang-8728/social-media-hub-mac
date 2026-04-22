@@ -337,7 +337,7 @@ def _process_items(items, offline_prefix=""):
             comment_url = f"https://www.bilibili.com/video/{bvid}?comment_root_id={rpid}" if bvid and rpid else ""
             icon = "🗑️" if ok else "❌"
             link = f" {tg.link('查看', comment_url)}" if comment_url else ""
-            tg.send_md(f"{icon} {tg.esc(uname)}{link}")
+            tg.send_md(f"{icon} {tg.esc(uname)}{link}", no_preview=True)
 
         elif uncertain_reason and is_comment and not offline_prefix:
             oid2        = item.get("oid")

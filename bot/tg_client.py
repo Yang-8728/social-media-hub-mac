@@ -16,10 +16,12 @@ def link(text: str, url: str) -> str:
     return f"[{esc(text)}]({safe_url})"
 
 
-def send(text: str, markdown=False) -> int | None:
+def send(text: str, markdown=False, no_preview=False) -> int | None:
     payload = {"chat_id": CHAT_ID, "text": text}
     if markdown:
         payload["parse_mode"] = "MarkdownV2"
+    if no_preview:
+        payload["link_preview_options"] = {"is_disabled": True}
     try:
         r = requests.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10)
         return r.json().get("result", {}).get("message_id")
@@ -28,5 +30,5 @@ def send(text: str, markdown=False) -> int | None:
         return None
 
 
-def send_md(text: str) -> int | None:
-    return send(text, markdown=True)
+def send_md(text: str, no_preview=False) -> int | None:
+    return send(text, markdown=True, no_preview=no_preview)
