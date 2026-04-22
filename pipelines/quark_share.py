@@ -151,7 +151,7 @@ def _send_dm_reply(uid: str, ig_username: str, share_url: str):
     try:
         sess = get_bilibili_session()
         csrf = get_csrf(sess)
-        msg = f"你好！这是 @{ig_username} 的视频合集（7天有效）：{share_url}"
+        msg = f"你好！这是 @{ig_username} 的视频合集（7天有效）：{share_url}\n转存哦！方便以后再看"
         ok = send_dm(sess, csrf, int(uid), msg)
         if ok:
             tg.send(f"✅ 已通过私信发送链接给 UID {uid}")
@@ -215,7 +215,7 @@ def run(ig_username: str, target: str = None):
             context = _lookup_pending(rpid)
             oid = context.get("oid")
             if oid:
-                reply_msg = f"你好！这是 @{ig_username} 的视频合集（7天有效）：{share_url}"
+                reply_msg = f"你好！这是 @{ig_username} 的视频合集（7天有效）：{share_url}\n转存哦！方便以后再看"
                 ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
                 fan_uname = context.get("uname", "粉丝")
                 tg.send(f"✅ 已在 B站回复 {fan_uname}" if ok else "⚠️ B站回复失败（继续，链接已生成）")
