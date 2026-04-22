@@ -1,7 +1,7 @@
 """
 YouTube → 微信视频号流程：yt-dlp 下载 → Selenium 上传。
 """
-import os, sys, time, json
+import os, sys, time, json, datetime
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,12 +12,26 @@ from platforms.wechat.uploader import WeChatUploader
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 STATE_FILE  = PROJECT_DIR / "temp" / "wechat_state.json"
+LOG_FILE    = PROJECT_DIR / "logs" / "wechat_uploads.jsonl"
 
 
 def _load_state() -> dict:
     if STATE_FILE.exists():
         return json.loads(STATE_FILE.read_text(encoding="utf-8"))
     return {"next_ep": 1, "uploaded": []}
+
+
+def _write_log(ep: int, title: str, url: str, video_path: str):
+    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+        "ep": ep,
+        "title": title,
+        "url": url,
+        "video_path": video_path,
+    }
+    with LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 def _save_state(state: dict):
@@ -70,6 +84,7 @@ def run_liked():
         state["next_ep"] = ep + 1
         state["uploaded"].append(short_url)
         _save_state(state)
+        _write_log(ep, title, short_url, video_path)
         tg.send(f"✅ 上传成功：{title}")
     else:
         tg.send(f"❌ 上传失败：{title}\n请查看 Mac 上的 Chrome 窗口")
