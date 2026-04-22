@@ -25,7 +25,7 @@ def _queue_dispatcher():
     while True:
         item = iq.pop()          # 阻塞等待
         iq.set_pending(item)
-        mid = tg.send(item["message"])
+        mid = tg.send(item["message"], no_preview=item.get("no_preview", False))
         if mid and item.get("on_sent"):
             try:
                 item["on_sent"](mid)

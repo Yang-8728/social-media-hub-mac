@@ -25,14 +25,14 @@ def is_interactive() -> bool:
     return _interactive_mode.is_set()
 
 
-def push(message: str, callback, on_sent=None):
+def push(message: str, callback, on_sent=None, no_preview=False):
     """
     feature 调用。
     message:  发给用户的文字
     callback: 收到回复后调用，参数为用户输入的原始文本
     on_sent:  消息发送成功后调用，参数为 Telegram message_id
     """
-    _q.put({"message": message, "callback": callback, "on_sent": on_sent})
+    _q.put({"message": message, "callback": callback, "on_sent": on_sent, "no_preview": no_preview})
 
 
 def pop(block=True):

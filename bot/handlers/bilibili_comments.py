@@ -525,7 +525,7 @@ def _process_items(items, offline_prefix=""):
             _oid2, _rpid2, _uname2 = oid2, rpid2, item.get("uname", "")
             def _on_sent(mid, _o=_oid2, _r=_rpid2, _u=_uname2):
                 register_reply_target(mid, _o, _r, _u)
-            iq.push(ask_msg, _unc_cb, on_sent=_on_sent)
+            iq.push(ask_msg, _unc_cb, on_sent=_on_sent, no_preview=True)
             ev.wait()
             ev.clear()
             sub_msg = _scan_sub_replies(oid2, rpid2)
