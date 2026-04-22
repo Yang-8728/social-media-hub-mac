@@ -191,6 +191,23 @@ def _blacklist_user(uid) -> bool:
     except Exception:
         return False
 
+# ── IG 账号识别 ───────────────────────────────────────────────────────────────
+
+_CHAPTER_RE = re.compile(r'^\d{1,2}:\d{2}[ \t]+(\S+)', re.MULTILINE)
+
+def _extract_ig_from_history(history: list) -> list:
+    """从私信历史里提取章节格式（时间戳 + 账号名）中的 IG 账号名"""
+    names = []
+    for h in history:
+        if h.get("from_me"):
+            continue
+        for m in _CHAPTER_RE.finditer(h.get("text", "")):
+            name = m.group(1)
+            if name not in names:
+                names.append(name)
+    return names
+
+
 # ── 消息格式化 ────────────────────────────────────────────────────────────────
 
 def _format_fan(item: dict) -> str | None:
@@ -237,6 +254,11 @@ def _format_fan(item: dict) -> str | None:
             for h in history[-10:]:
                 who = "➡️ 我" if h["from_me"] else f"👤 {uname}"
                 msg += f"\n{who}：{tg.esc(h['text'][:80])}"
+        # 检测历史消息里是否含章节格式（时间戳 + IG账号名）
+        ig_names = _extract_ig_from_history(history)
+        if ig_names:
+            msg += f"\n\n🔍 检测到 IG 账号：`{tg.esc(ig_names[0])}`\n"
+            msg += f"👉 `/share {tg.esc(ig_names[0])}`"
         return msg
 
     elif t == "error":
