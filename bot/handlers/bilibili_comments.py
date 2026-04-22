@@ -315,6 +315,15 @@ def _process_items(items, offline_prefix=""):
         spam_reason      = _is_spam(content)     if is_comment else None
         uncertain_reason = _is_uncertain(content) if is_comment and not spam_reason else None
 
+        if is_comment and not spam_reason and not uncertain_reason:
+            try:
+                sess, _ = _get_session()
+                if sess and bili_monitor.fetch_comment_has_images(
+                        sess, item.get("oid"), item.get("rpid")):
+                    uncertain_reason = "含图片"
+            except Exception:
+                pass
+
         if spam_reason:
             oid   = item.get("oid")
             rpid  = item.get("rpid")

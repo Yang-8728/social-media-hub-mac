@@ -153,6 +153,16 @@ def fetch_new_at(session, last_cursor):
 
 # ── 拉取新私信 ─────────────────────────────────────────────────────────────────
 
+def fetch_comment_has_images(session, oid: int, rpid: int) -> bool:
+    """检查评论是否含图片附件（通知 API 的 source_content 不含此信息）"""
+    r = api_get(session, "https://api.bilibili.com/x/v2/reply/info",
+                params={"oid": oid, "type": 1, "root": rpid})
+    if not r or r.get("code") != 0:
+        return False
+    content = ((r.get("data") or {}).get("reply") or {}).get("content") or {}
+    return bool(content.get("pictures"))
+
+
 def _fetch_uname(session, uid: int) -> str:
     r = api_get(session, "https://api.bilibili.com/x/web-interface/card",
                 params={"mid": uid})
