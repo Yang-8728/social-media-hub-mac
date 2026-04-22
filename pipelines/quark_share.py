@@ -15,8 +15,25 @@ COOKIE_FILE   = PROJECT_DIR / "temp" / "bili_cookies_ai_vanvan.json"
 PENDING_FILE  = PROJECT_DIR / "temp" / "pending_comments.json"
 DOWNLOAD_DIR  = PROJECT_DIR / "videos" / "quark"
 SESSION_FILE  = str(PROJECT_DIR / "temp" / "ai_vanvan_session")
+SHARE_LOG     = PROJECT_DIR / "logs" / "quark_shares.jsonl"
 
 SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
+
+
+def _write_log(ig_username: str, fan_uname: str, fan_uid: str,
+               video_count: int, share_url: str, status: str):
+    record = {
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "fan": fan_uname,
+        "fan_uid": fan_uid,
+        "ig": ig_username,
+        "videos": video_count,
+        "url": share_url,
+        "status": status,
+    }
+    SHARE_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(SHARE_LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 # ── Instagram 下载 ────────────────────────────────────────────────────────────
@@ -86,7 +103,7 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
 
 def _zip_videos(video_paths: list, ig_username: str, uid: str = None) -> str:
     date_str = datetime.now().strftime("%Y%m%d")
-    name = f"{ig_username}_{uid}_{date_str}" if uid else f"{ig_username}_{date_str}"
+    name = f"{uid}_{ig_username}_{date_str}" if uid else f"{ig_username}_{date_str}"
     zip_path = str(PROJECT_DIR / "temp" / f"{name}.zip")
     tg.send(f"📦 正在打包 {len(video_paths)} 个视频...")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
@@ -231,6 +248,15 @@ def run(ig_username: str, target: str = None):
         f"✅ 分享完成！\n"
         f"📦 @{ig_username} 合集（{len(video_paths)} 个视频）\n"
         f"🔗 {share_url}"
+    )
+
+    _write_log(
+        ig_username=ig_username,
+        fan_uname=fan_label or "",
+        fan_uid=uid_val if target and target.startswith("dm:") else "",
+        video_count=len(video_paths),
+        share_url=share_url,
+        status="ok",
     )
 
     try:
