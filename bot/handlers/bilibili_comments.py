@@ -138,11 +138,18 @@ def _save_pending(item: dict):
 
 # ── 垃圾检测 ──────────────────────────────────────────────────────────────────
 
+_NORMALIZE_RE = re.compile(r'[!！@#$%^&*()【】\[\]{}<>|\\/:;\'",.\s]')
+
+def _normalize(text: str) -> str:
+    """去除常见插字符，防止「我动态!有」之类的标点拆词绕过。"""
+    return _NORMALIZE_RE.sub("", text)
+
 def _is_spam(text: str) -> str | None:
     if _B23_RE.search(text):
         return "含b23.tv链接"
+    normalized = _normalize(text)
     for kw in SPAM_KEYWORDS + _load_custom_keywords():
-        if kw in text:
+        if kw in text or kw in normalized:
             return f"关键词: {kw}"
     return None
 
@@ -541,24 +548,24 @@ def _process_items(items, offline_prefix=""):
             if is_comment and not offline_prefix:
                 oid2  = item.get("oid")
                 rpid2 = item.get("rpid")
-                mid = tg.send_md(prefix_md + msg)
+                mid = tg.send_md(prefix_md + msg, no_preview=True)
                 if mid and oid2 and rpid2:
                     register_reply_target(mid, oid2, rpid2, item.get("uname", ""))
                 sub_msg = _scan_sub_replies(oid2, rpid2)
                 if sub_msg:
-                    tg.send_md(sub_msg)
+                    tg.send_md(sub_msg, no_preview=True)
 
             elif item.get("type") == "dm" and not offline_prefix:
                 dm_uid   = item.get("uid")
                 dm_uname = item.get("uname", str(dm_uid))
                 ig_names = _extract_ig_from_history(item.get("history", []))
                 ig_detected = ig_names[0] if ig_names else None
-                mid = tg.send_md(msg + "\n\n_💬 直接回复此消息即可发送私信_")
+                mid = tg.send_md(msg + "\n\n_💬 直接回复此消息即可发送私信_", no_preview=True)
                 if mid and dm_uid:
                     register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)
 
             else:
-                tg.send_md(prefix_md + msg)
+                tg.send_md(prefix_md + msg, no_preview=True)
 
         time.sleep(0.3)
 
