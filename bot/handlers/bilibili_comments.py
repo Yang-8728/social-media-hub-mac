@@ -500,6 +500,8 @@ def _cleanup_videos():
     dirs = [
         os.path.join(PROJECT_DIR, "videos", "downloads"),
         os.path.join(PROJECT_DIR, "videos", "merged"),
+        os.path.join(PROJECT_DIR, "videos", "youtube"),
+        os.path.join(PROJECT_DIR, "videos", "quark"),
     ]
     files = []
     for d in dirs:
@@ -528,6 +530,7 @@ def _cleanup_videos():
             pass
     if deleted_bytes:
         print(f"[bilibili_comments] 视频清理完成，释放 {deleted_bytes/1024**3:.1f}GB", flush=True)
+        tg.send(f"🧹 视频文件超 10GB，已自动清理，释放 {deleted_bytes/1024**2:.0f}MB")
 
 
 # ── 主监控循环（后台线程）────────────────────────────────────────────────────
