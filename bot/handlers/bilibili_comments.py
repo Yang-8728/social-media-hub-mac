@@ -256,6 +256,7 @@ def _full_scan(label="定期"):
         return
 
     deleted = failed = 0
+    deleted_details = []  # [(uname, text, reason)]
     for aid in oids:
         if not aid:
             continue
@@ -277,13 +278,16 @@ def _full_scan(label="定期"):
             for reply in replies:
                 member = reply.get("member") or {}
                 uid    = str(member.get("mid", ""))
+                uname  = member.get("uname", "?")
                 rpid   = reply.get("rpid", 0)
                 text   = (reply.get("content") or {}).get("message", "")
-                if uid != my_uid and _is_spam(text):
+                reason = _is_spam(text)
+                if uid != my_uid and reason:
                     ok = _delete_comment(aid, rpid)
                     if ok is True:
                         _blacklist_user(uid) if uid else None
                         deleted += 1
+                        deleted_details.append((uname, text[:60], reason))
                     elif ok is False:
                         failed += 1
 
@@ -293,11 +297,13 @@ def _full_scan(label="定期"):
                         for sub in subs:
                             if str(sub["uid"]) == my_uid:
                                 continue
-                            if _is_spam(sub["content"]):
+                            sub_reason = _is_spam(sub["content"])
+                            if sub_reason:
                                 ok = _delete_comment(aid, sub["rpid"])
                                 if ok is True:
                                     _blacklist_user(sub["uid"]) if sub["uid"] else None
                                     deleted += 1
+                                    deleted_details.append((sub.get("uname", "?"), sub["content"][:60], sub_reason))
                                 elif ok is False:
                                     failed += 1
                     except Exception:
@@ -313,7 +319,8 @@ def _full_scan(label="定期"):
     summary = f"🔍 {label}扫描完成：删除 {deleted} 条垃圾评论" + (f"，失败 {failed} 条" if failed else "")
     print(f"[bilibili_comments] {summary}", flush=True)
     if deleted:
-        tg.send(summary)
+        detail_lines = "\n".join(f"  👤{u}：{t}（{r}）" for u, t, r in deleted_details)
+        tg.send(f"{summary}\n{detail_lines}")
 
 
 def _load_delete_skip() -> set:
