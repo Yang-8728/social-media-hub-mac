@@ -321,7 +321,10 @@ def _delete_comment(oid, rpid) -> bool:
             data={"oid": str(oid), "type": "1", "rpid": str(rpid), "csrf": csrf},
             timeout=10
         )
-        return r.json().get("code") == 0
+        resp = r.json()
+        if resp.get("code") != 0:
+            print(f"[bilibili_comments] 删除失败 oid={oid} rpid={rpid} code={resp.get('code')} msg={resp.get('message')}", flush=True)
+        return resp.get("code") == 0
     except Exception:
         return False
 
