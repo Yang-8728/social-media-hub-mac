@@ -335,9 +335,10 @@ def _blacklist_user(uid) -> bool:
 # ── IG 账号识别 ───────────────────────────────────────────────────────────────
 
 _CHAPTER_RE = re.compile(r'^\d{1,2}:\d{2}[ \t]+(\S+)', re.MULTILINE)
+_IG_NAME_RE = re.compile(r'^([A-Za-z0-9._]{3,30})$', re.MULTILINE)
 
 def _extract_ig_from_history(history: list) -> list:
-    """从私信历史里提取章节格式（时间戳 + 账号名）中的 IG 账号名"""
+    """从私信历史里提取 IG 账号名（章节格式优先，兜底用裸账号正则）"""
     names = []
     for h in history:
         if h.get("from_me"):
@@ -346,6 +347,14 @@ def _extract_ig_from_history(history: list) -> list:
             name = m.group(1)
             if name not in names:
                 names.append(name)
+    if not names:
+        for h in history:
+            if h.get("from_me"):
+                continue
+            for m in _IG_NAME_RE.finditer(h.get("text", "").strip()):
+                name = m.group(1)
+                if name not in names:
+                    names.append(name)
     return names
 
 
