@@ -58,7 +58,7 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
     else:
         raise RuntimeError(f"Instaloader session 文件不存在: {SESSION_FILE}")
 
-    tg.send(f"📥 正在获取 @{ig_username} 的视频列表...")
+    tg.send(f"📥 正在获取 @{ig_username} 的视频列表，下载中...")
     profile = Profile.from_username(loader.context, ig_username)
 
     video_paths = []
@@ -75,7 +75,6 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
                 video_paths.append(str(out_path))
                 total_bytes += size
             else:
-                tg.send(f"⬇️ 下载第 {count+1} 个视频 ({total_bytes/1024/1024:.1f}MB 已累计)...")
                 r = requests.get(post.video_url, stream=True, timeout=60)
                 r.raise_for_status()
                 with open(out_path, "wb") as f:
@@ -87,7 +86,6 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
 
             count += 1
             if total_bytes >= size_limit:
-                tg.send(f"✅ 已达 {total_bytes/1024/1024:.1f}MB，停止下载（共 {count} 个视频）")
                 break
             time.sleep(1)
         except Exception as e:
@@ -244,11 +242,20 @@ def run(ig_username: str, target: str = None):
             else:
                 tg.send(f"⚠️ 未找到 rpid={rpid} 的评论上下文，跳过回复")
 
+    import datetime
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    recipient = fan_label if fan_label else "（无指定接收人）"
     share_msg = f"兄弟！这是 @{ig_username} 的视频合集（7天有效）：{share_url}\n转存哦！方便以后再看"
-    if target:
-        tg.send(f"✅ 分享完成！\n📦 @{ig_username} 合集（{len(video_paths)} 个视频）\n🔗 {share_url}")
-    else:
-        tg.send(f"✅ 分享完成！\n\n{share_msg}")
+    done_msg = (
+        f"✅ 分享完成！\n"
+        f"👤 分享给：{recipient}\n"
+        f"📦 @{ig_username} 合集（{len(video_paths)} 个视频）\n"
+        f"🕐 时间：{now_str}\n"
+        f"🔗 {share_url}"
+    )
+    tg.send(done_msg, no_preview=True)
+    if not target:
+        tg.send(share_msg, no_preview=True)
 
     _write_log(
         ig_username=ig_username,
