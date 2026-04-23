@@ -281,9 +281,11 @@ def _full_scan(label="定期"):
                 text   = (reply.get("content") or {}).get("message", "")
                 if uid != my_uid and _is_spam(text):
                     ok = _delete_comment(aid, rpid)
-                    _blacklist_user(uid) if ok and uid else None
-                    deleted += 1 if ok else 0
-                    failed  += 0 if ok else 1
+                    if ok is True:
+                        _blacklist_user(uid) if uid else None
+                        deleted += 1
+                    elif ok is False:
+                        failed += 1
 
                 if reply.get("rcount", 0) > 0:
                     try:
@@ -293,9 +295,11 @@ def _full_scan(label="定期"):
                                 continue
                             if _is_spam(sub["content"]):
                                 ok = _delete_comment(aid, sub["rpid"])
-                                _blacklist_user(sub["uid"]) if ok and sub["uid"] else None
-                                deleted += 1 if ok else 0
-                                failed  += 0 if ok else 1
+                                if ok is True:
+                                    _blacklist_user(sub["uid"]) if sub["uid"] else None
+                                    deleted += 1
+                                elif ok is False:
+                                    failed += 1
                     except Exception:
                         pass
                 time.sleep(0.1)
@@ -329,9 +333,10 @@ def _save_delete_skip(skip: set):
 
 _delete_skip: set = _load_delete_skip()
 
-def _delete_comment(oid, rpid) -> bool:
+def _delete_comment(oid, rpid):
+    """返回 True=删成功，False=删失败，None=已跳过"""
     if str(rpid) in _delete_skip:
-        return False
+        return None
     session, csrf = _get_session()
     if not session or not csrf:
         return False
