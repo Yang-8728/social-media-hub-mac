@@ -119,6 +119,7 @@ def main():
                                     from platforms.bilibili.monitor import get_bilibili_session, _fetch_dm_history
                                     from bot.handlers.bilibili_comments import _extract_ig_from_history
                                     try:
+                                        tg.send(f"🔍 正在查找 {n} 的私信中的 IG 账号...")
                                         sess = get_bilibili_session()
                                         history = _fetch_dm_history(sess, int(u), size=20)
                                         ig_names = _extract_ig_from_history(history)
@@ -173,6 +174,9 @@ def main():
                     else:
                         threading.Thread(target=wechat_pipeline.run_liked, daemon=True).start()
 
+
+                elif text == "/share":
+                    tg.send("用法：回复粉丝私信消息后发 /share，或直接用 /share ig用户名 [rpid]")
 
                 elif text.startswith("/share "):
                     parts = text.split()
