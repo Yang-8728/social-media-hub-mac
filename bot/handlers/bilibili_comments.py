@@ -492,6 +492,44 @@ def _format_fan(item: dict) -> str | None:
 
     return None
 
+# ── 视频文件清理 ──────────────────────────────────────────────────────────────
+
+VIDEO_LIMIT_BYTES = 10 * 1024 ** 3  # 10GB
+
+def _cleanup_videos():
+    dirs = [
+        os.path.join(PROJECT_DIR, "videos", "downloads"),
+        os.path.join(PROJECT_DIR, "videos", "merged"),
+    ]
+    files = []
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        for root, _, fnames in os.walk(d):
+            for fn in fnames:
+                fp = os.path.join(root, fn)
+                try:
+                    files.append((os.path.getmtime(fp), os.path.getsize(fp), fp))
+                except Exception:
+                    pass
+    total = sum(s for _, s, _ in files)
+    if total <= VIDEO_LIMIT_BYTES:
+        return
+    files.sort()  # 最旧的在前
+    deleted_bytes = 0
+    for mtime, size, fp in files:
+        if total - deleted_bytes <= VIDEO_LIMIT_BYTES:
+            break
+        try:
+            os.remove(fp)
+            deleted_bytes += size
+            print(f"[bilibili_comments] 清理旧视频: {fp}", flush=True)
+        except Exception:
+            pass
+    if deleted_bytes:
+        print(f"[bilibili_comments] 视频清理完成，释放 {deleted_bytes/1024**3:.1f}GB", flush=True)
+
+
 # ── 主监控循环（后台线程）────────────────────────────────────────────────────
 
 def run():
@@ -507,6 +545,7 @@ def run():
         print(f"[bilibili_comments] 发现 {len(backlog)} 条积压通知，开始处理", flush=True)
         _process_items(backlog, offline_prefix="[离线期间] ")
 
+    threading.Thread(target=_cleanup_videos, daemon=True).start()
     # 启动时立即做一次全量扫描
     threading.Thread(target=_full_scan, args=("启动",), daemon=True).start()
 

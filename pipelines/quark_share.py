@@ -113,6 +113,11 @@ def _zip_videos(video_paths: list, ig_username: str, uid: str = None) -> str:
             zf.write(vp, os.path.basename(vp))
     size_mb = os.path.getsize(zip_path) / 1024 / 1024
     tg.send(f"📦 打包完成：{size_mb:.1f}MB")
+    for vp in video_paths:
+        try:
+            os.remove(vp)
+        except Exception:
+            pass
     return zip_path
 
 
