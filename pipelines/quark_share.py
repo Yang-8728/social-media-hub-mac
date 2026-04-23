@@ -101,6 +101,60 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
     return video_paths
 
 
+# ── 码率扩容 ──────────────────────────────────────────────────────────────────
+
+TARGET_SIZE = 210 * 1024 * 1024  # 210MB，留 10MB 余量
+
+def _upscale_bitrate(video_paths: list) -> list:
+    """当视频总大小 < 200MB 时，重编码提升码率使总大小超过 210MB。"""
+    import subprocess
+
+    total_bytes = sum(os.path.getsize(p) for p in video_paths)
+    if total_bytes >= 200 * 1024 * 1024:
+        return video_paths
+
+    # 算总时长（秒）
+    total_duration = 0.0
+    for p in video_paths:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", p],
+            capture_output=True, text=True
+        )
+        try:
+            total_duration += float(result.stdout.strip())
+        except ValueError:
+            pass
+
+    if total_duration <= 0:
+        return video_paths
+
+    # 目标总码率（bps），audio 约 128kbps，其余全给视频
+    target_total_bps = (TARGET_SIZE * 8) / total_duration
+    video_bps = int(target_total_bps - 128_000)
+    if video_bps <= 0:
+        return video_paths
+
+    tg.send(f"🔧 视频总大小 {total_bytes/1024/1024:.1f}MB < 200MB，正在升码率至约 210MB...")
+
+    new_paths = []
+    for p in video_paths:
+        out = p + ".upscaled.mp4"
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", p, "-c:v", "libx264", "-b:v", f"{video_bps}",
+             "-c:a", "copy", out],
+            capture_output=True
+        )
+        if os.path.exists(out) and os.path.getsize(out) > 0:
+            os.remove(p)
+            os.rename(out, p)
+        new_paths.append(p)
+
+    new_total = sum(os.path.getsize(p) for p in new_paths)
+    tg.send(f"✅ 升码率完成：{new_total/1024/1024:.1f}MB")
+    return new_paths
+
+
 # ── 打包 ──────────────────────────────────────────────────────────────────────
 
 def _zip_videos(video_paths: list, ig_username: str, uid: str = None) -> str:
@@ -213,6 +267,7 @@ def run(ig_username: str, target: str = None):
         uid_val = parts[0]
         fan_label = parts[1].replace("_", " ") if len(parts) > 1 else uid_val
     try:
+        video_paths = _upscale_bitrate(video_paths)
         zip_path = _zip_videos(video_paths, ig_username, uid=fan_label)
     except Exception as e:
         tg.send(f"❌ 打包失败：{e}")
