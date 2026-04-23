@@ -38,13 +38,8 @@ def _write_log(ig_username: str, fan_uname: str, fan_uid: str,
 
 # ── Instagram 下载 ────────────────────────────────────────────────────────────
 
-def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list:
+def _get_ig_loader():
     import instaloader
-    from instaloader import Profile
-
-    out_dir = DOWNLOAD_DIR / ig_username
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     loader = instaloader.Instaloader(
         quiet=True,
         save_metadata=False,
@@ -52,11 +47,20 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
         user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     )
-
     if os.path.exists(SESSION_FILE):
         loader.load_session_from_file("ai_vanvan", SESSION_FILE)
     else:
         raise RuntimeError(f"Instaloader session 文件不存在: {SESSION_FILE}")
+    return loader
+
+
+def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list:
+    from instaloader import Profile
+
+    out_dir = DOWNLOAD_DIR / ig_username
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    loader = _get_ig_loader()
 
     tg.send(f"📥 正在获取 @{ig_username} 的视频列表，下载中...")
     profile = Profile.from_username(loader.context, ig_username)

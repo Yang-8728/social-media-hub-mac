@@ -343,9 +343,37 @@ def _blacklist_user(uid) -> bool:
 
 _CHAPTER_RE = re.compile(r'^\d{1,2}:\d{2}[ \t]+(\S+)', re.MULTILINE)
 _IG_NAME_RE = re.compile(r'^([A-Za-z0-9._]{3,30})$', re.MULTILINE)
+# 匹配两个单词组成的名字，如 "mckinley bethel"
+_IG_FUZZY_RE = re.compile(r'\b([A-Za-z0-9]{2,20})\s+([A-Za-z0-9]{2,20})\b')
+
+def _resolve_ig_username(raw: str) -> str | None:
+    """把可能带空格的名字尝试各种连接符，返回第一个存在的 IG 用户名，找不到返回 None。"""
+    parts = raw.strip().lower().split()
+    if len(parts) == 1:
+        return raw.strip()
+    candidates = [
+        ".".join(parts),
+        "_".join(parts),
+        "".join(parts),
+    ]
+    try:
+        from instaloader import Instaloader, Profile, exceptions as il_ex
+        from pipelines.quark_share import _get_ig_loader
+        loader = _get_ig_loader()
+        for c in candidates:
+            try:
+                Profile.from_username(loader.context, c)
+                return c
+            except il_ex.ProfileNotExistsException:
+                continue
+            except Exception:
+                break
+    except Exception:
+        pass
+    return candidates[0]  # 找不到就用点连接兜底
 
 def _extract_ig_from_history(history: list) -> list:
-    """从私信历史里提取 IG 账号名（章节格式优先，兜底用裸账号正则）"""
+    """从私信历史里提取 IG 账号名（章节格式优先，兜底用裸账号正则，再兜底模糊两词匹配）"""
     names = []
     for h in history:
         if h.get("from_me"):
@@ -362,6 +390,15 @@ def _extract_ig_from_history(history: list) -> list:
                 name = m.group(1)
                 if name not in names:
                     names.append(name)
+    if not names:
+        for h in history:
+            if h.get("from_me"):
+                continue
+            for m in _IG_FUZZY_RE.finditer(h.get("text", "")):
+                raw = m.group(0)
+                resolved = _resolve_ig_username(raw)
+                if resolved and resolved not in names:
+                    names.append(resolved)
     return names
 
 
