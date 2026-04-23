@@ -167,7 +167,7 @@ def _zip_videos(video_paths: list, ig_username: str, uid: str = None) -> str:
     name = f"{uid}_{ig_username}_{date_str}" if uid else f"{ig_username}_{date_str}"
     zip_path = str(PROJECT_DIR / "temp" / f"{name}.zip")
     tg.send(f"📦 正在打包 {len(video_paths)} 个视频...")
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
         for vp in video_paths:
             zf.write(vp, os.path.basename(vp))
     size_mb = os.path.getsize(zip_path) / 1024 / 1024
