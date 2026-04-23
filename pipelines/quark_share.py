@@ -247,6 +247,7 @@ def run(ig_username: str, target: str = None):
                 reply_msg = f"兄弟！这是 @{ig_username} 的视频合集（7天有效）：{share_url}\n转存哦！方便以后再看"
                 ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
                 fan_uname = context.get("uname", "粉丝")
+                fan_label = fan_uname
                 tg.send(f"✅ 已在 B站回复 {fan_uname}" if ok else "⚠️ B站回复失败（继续，链接已生成）")
             else:
                 tg.send(f"⚠️ 未找到 rpid={rpid} 的评论上下文，跳过回复")
