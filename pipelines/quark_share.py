@@ -143,7 +143,10 @@ def _upscale_bitrate(video_paths: list) -> list:
     for p in video_paths:
         out = p + ".upscaled.mp4"
         subprocess.run(
-            [FFMPEG, "-y", "-i", p, "-c:v", "libx264", "-b:v", f"{video_bps}",
+            [FFMPEG, "-y", "-i", p, "-c:v", "libx264",
+             "-b:v", str(video_bps), "-minrate", str(video_bps),
+             "-maxrate", str(video_bps), "-bufsize", str(video_bps),
+             "-x264-params", "nal-hrd=cbr:force-cfr=1",
              "-c:a", "copy", out],
             capture_output=True
         )
