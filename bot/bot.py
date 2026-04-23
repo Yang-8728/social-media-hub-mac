@@ -109,11 +109,17 @@ def main():
                             iq.resolve(text)
                         elif target["type"] == "comment":
                             oid, rpid, uname = target["oid"], target["rpid"], target["uname"]
-                            def _do_reply(t=text, o=oid, r=rpid, u=uname):
-                                from pipelines.quark_share import _reply_bilibili
-                                ok = _reply_bilibili(o, r, t)
-                                tg.send(f"✅ 已回复 {u}" if ok else "❌ 回复失败")
-                            threading.Thread(target=_do_reply, daemon=True).start()
+                            if text.startswith("/share "):
+                                ig_user = text.split()[1]
+                                def _do_share_comment(ig=ig_user, r=rpid):
+                                    quark_share.run(ig, str(r))
+                                threading.Thread(target=_do_share_comment, daemon=True).start()
+                            else:
+                                def _do_reply(t=text, o=oid, r=rpid, u=uname):
+                                    from pipelines.quark_share import _reply_bilibili
+                                    ok = _reply_bilibili(o, r, t)
+                                    tg.send(f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                threading.Thread(target=_do_reply, daemon=True).start()
                             if iq.has_pending():
                                 iq.resolve("0")
                         elif target["type"] == "dm":
