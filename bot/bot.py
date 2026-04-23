@@ -104,13 +104,18 @@ def main():
                     reply_mid = reply_to.get("message_id")
                     target = bilibili_comments.lookup_reply_target(reply_mid)
                     if target:
-                        if target["type"] == "comment":
+                        if iq.has_pending() and target["type"] == "comment" and text.strip() in ("0", "1", "y"):
+                            # Reply to an uncertain-question message: treat as IQ answer
+                            iq.resolve(text)
+                        elif target["type"] == "comment":
                             oid, rpid, uname = target["oid"], target["rpid"], target["uname"]
                             def _do_reply(t=text, o=oid, r=rpid, u=uname):
                                 from pipelines.quark_share import _reply_bilibili
                                 ok = _reply_bilibili(o, r, t)
                                 tg.send(f"✅ 已回复 {u}" if ok else "❌ 回复失败")
                             threading.Thread(target=_do_reply, daemon=True).start()
+                            if iq.has_pending():
+                                iq.resolve("0")
                         elif target["type"] == "dm":
                             uid, uname = target["uid"], target["uname"]
                             if text.strip() == "/share":
@@ -141,9 +146,8 @@ def main():
                                     except Exception as e:
                                         tg.send(f"❌ 发送失败: {e}")
                                 threading.Thread(target=_do_dm, daemon=True).start()
-                        # 如果 queue 正在等待（不确定评论 ask），顺带解锁
-                        if iq.has_pending():
-                            iq.resolve("0")
+                            if iq.has_pending():
+                                iq.resolve("0")
                         continue
                     else:
                         tg.send("⚠️ 找不到对应的评论/私信目标，可能已超出记录范围")
