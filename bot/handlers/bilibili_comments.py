@@ -376,7 +376,7 @@ def _blacklist_user(uid) -> bool:
 _CHAPTER_RE = re.compile(r'^\d{1,2}:\d{2}[ \t]+(\S+)', re.MULTILINE)
 _IG_NAME_RE = re.compile(r'^([A-Za-z0-9._]{3,30})$', re.MULTILINE)
 # 匹配两个单词组成的名字，如 "mckinley bethel"
-_IG_FUZZY_RE = re.compile(r'\b([A-Za-z0-9]{2,20})\s+([A-Za-z0-9]{2,20})\b')
+_IG_FUZZY_RE = re.compile(r'(?<![A-Za-z0-9])([A-Za-z0-9]{2,20})\s+([A-Za-z0-9]{2,20})(?![A-Za-z0-9])')
 
 def _resolve_ig_username(raw: str) -> str | None:
     """把可能带空格的名字尝试各种连接符，返回第一个存在的 IG 用户名，找不到返回 None。"""
