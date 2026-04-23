@@ -307,7 +307,7 @@ def _full_scan(label="定期"):
 
     summary = f"🔍 {label}扫描完成：删除 {deleted} 条垃圾评论" + (f"，失败 {failed} 条" if failed else "")
     print(f"[bilibili_comments] {summary}", flush=True)
-    if deleted or failed:
+    if deleted:
         tg.send(summary)
 
 

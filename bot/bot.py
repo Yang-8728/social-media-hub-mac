@@ -48,7 +48,6 @@ def _get_updates(offset=None):
 
 def main():
     print(f"[{time.strftime('%H:%M:%S')}] Bot starting...", flush=True)
-    tg.send_md("Bot started on Mac\\!")
 
     # 后台线程
     threading.Thread(target=_queue_dispatcher, daemon=True).start()
