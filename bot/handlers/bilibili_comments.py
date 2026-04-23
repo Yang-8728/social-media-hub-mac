@@ -47,6 +47,7 @@ COOKIE_FILE        = os.path.join(PROJECT_DIR, "temp", "bili_cookies_ai_vanvan.j
 CUSTOM_KW_FILE     = os.path.join(PROJECT_DIR, "config", "spam_keywords_custom.json")
 REPLY_TARGETS_FILE = os.path.join(PROJECT_DIR, "temp", "reply_targets.json")
 PENDING_FILE       = os.path.join(PROJECT_DIR, "temp", "pending_comments.json")
+DELETE_SKIP_FILE   = os.path.join(PROJECT_DIR, "temp", "delete_skip.json")
 
 ACCOUNT_NAME  = "ai_vanvan"
 MAX_VIDEOS    = 3
@@ -311,7 +312,26 @@ def _full_scan(label="定期"):
         tg.send(summary)
 
 
+def _load_delete_skip() -> set:
+    try:
+        if os.path.exists(DELETE_SKIP_FILE):
+            return set(json.load(open(DELETE_SKIP_FILE)))
+    except Exception:
+        pass
+    return set()
+
+def _save_delete_skip(skip: set):
+    try:
+        with open(DELETE_SKIP_FILE, "w") as f:
+            json.dump(list(skip), f)
+    except Exception:
+        pass
+
+_delete_skip: set = _load_delete_skip()
+
 def _delete_comment(oid, rpid) -> bool:
+    if str(rpid) in _delete_skip:
+        return False
     session, csrf = _get_session()
     if not session or not csrf:
         return False
@@ -322,9 +342,13 @@ def _delete_comment(oid, rpid) -> bool:
             timeout=10
         )
         resp = r.json()
-        if resp.get("code") != 0:
-            print(f"[bilibili_comments] 删除失败 oid={oid} rpid={rpid} code={resp.get('code')} msg={resp.get('message')}", flush=True)
-        return resp.get("code") == 0
+        code = resp.get("code")
+        if code != 0:
+            print(f"[bilibili_comments] 删除失败 oid={oid} rpid={rpid} code={code} msg={resp.get('message')}", flush=True)
+            if code == -403:
+                _delete_skip.add(str(rpid))
+                _save_delete_skip(_delete_skip)
+        return code == 0
     except Exception:
         return False
 
