@@ -104,6 +104,8 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
 # ── 码率扩容 ──────────────────────────────────────────────────────────────────
 
 TARGET_SIZE = 210 * 1024 * 1024  # 210MB，留 10MB 余量
+FFPROBE = "/opt/homebrew/bin/ffprobe"
+FFMPEG  = "/opt/homebrew/bin/ffmpeg"
 
 def _upscale_bitrate(video_paths: list) -> list:
     """当视频总大小 < 200MB 时，重编码提升码率使总大小超过 210MB。"""
@@ -117,7 +119,7 @@ def _upscale_bitrate(video_paths: list) -> list:
     total_duration = 0.0
     for p in video_paths:
         result = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+            [FFPROBE, "-v", "error", "-show_entries", "format=duration",
              "-of", "default=noprint_wrappers=1:nokey=1", p],
             capture_output=True, text=True
         )
@@ -141,7 +143,7 @@ def _upscale_bitrate(video_paths: list) -> list:
     for p in video_paths:
         out = p + ".upscaled.mp4"
         subprocess.run(
-            ["ffmpeg", "-y", "-i", p, "-c:v", "libx264", "-b:v", f"{video_bps}",
+            [FFMPEG, "-y", "-i", p, "-c:v", "libx264", "-b:v", f"{video_bps}",
              "-c:a", "copy", out],
             capture_output=True
         )
