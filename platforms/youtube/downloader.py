@@ -18,7 +18,7 @@ class YouTubeDownloader:
         cmd = [
             YT_DLP,
             "--cookies-from-browser", "chrome",
-            "--format", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
+            "--format", "bestvideo[height<=1080][vcodec^=avc][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]",
             "--merge-output-format", "mp4",
             "--download-archive", archive_path,
             "--output", output_template,
