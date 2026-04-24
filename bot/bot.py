@@ -163,6 +163,7 @@ def main():
                         continue
                     else:
                         tg.send("⚠️ 找不到对应的评论/私信目标，可能已超出记录范围")
+                        continue
 
                 # ── 交互回复（队列等待中）────────────────────────────────────
                 if iq.has_pending():

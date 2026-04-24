@@ -95,25 +95,26 @@ def _save_reply_targets(targets: dict):
 _reply_targets: dict = _load_reply_targets()
 
 def register_reply_target(msg_id: int, oid, rpid, uname: str):
-    _reply_targets[msg_id] = {"type": "comment", "oid": oid, "rpid": rpid, "uname": uname}
+    _reply_targets[int(msg_id)] = {"type": "comment", "oid": oid, "rpid": rpid, "uname": uname}
     if len(_reply_targets) > MAX_REPLY_TARGETS:
         del _reply_targets[next(iter(_reply_targets))]
     _save_reply_targets(_reply_targets)
 
 def register_dm_target(msg_id: int, uid, uname: str, ig_username: str = None):
-    _reply_targets[msg_id] = {"type": "dm", "uid": uid, "uname": uname, "ig": ig_username}
+    _reply_targets[int(msg_id)] = {"type": "dm", "uid": uid, "uname": uname, "ig": ig_username}
     if len(_reply_targets) > MAX_REPLY_TARGETS:
         del _reply_targets[next(iter(_reply_targets))]
     _save_reply_targets(_reply_targets)
 
 def lookup_reply_target(msg_id: int):
-    if msg_id in _reply_targets:
-        return _reply_targets[msg_id]
+    key = int(msg_id)
+    if key in _reply_targets:
+        return _reply_targets[key]
     # 外部脚本可能写入了文件但未更新内存，重新加载一次
     fresh = _load_reply_targets()
-    if msg_id in fresh:
+    if key in fresh:
         _reply_targets.update(fresh)
-        return _reply_targets[msg_id]
+        return _reply_targets[key]
     return None
 
 # ── 待回复上下文存储 ──────────────────────────────────────────────────────────
