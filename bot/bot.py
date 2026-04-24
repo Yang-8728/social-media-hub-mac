@@ -103,6 +103,7 @@ def main():
                 if reply_to:
                     reply_mid = reply_to.get("message_id")
                     target = bilibili_comments.lookup_reply_target(reply_mid)
+                    print(f"[reply] mid={reply_mid} target={'found' if target else 'not found'}", flush=True)
                     if target:
                         if iq.has_pending() and target["type"] == "comment" and text.strip() in ("0", "1", "y"):
                             # Reply to an uncertain-question message: treat as IQ answer
