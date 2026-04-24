@@ -245,6 +245,33 @@ def _send_dm_reply(uid: str, ig_username: str, share_url: str):
         tg.send(f"⚠️ 私信发送出错：{e}（链接已生成）")
 
 
+CACHE_DAYS = 7
+
+
+def _lookup_cached_url(ig_username: str) -> str | None:
+    """查 quark_shares.jsonl，7天内有成功记录则返回链接，否则 None。"""
+    if not SHARE_LOG.exists():
+        return None
+    from datetime import datetime, timedelta
+    cutoff = datetime.now() - timedelta(days=CACHE_DAYS)
+    best = None
+    with open(SHARE_LOG, encoding="utf-8") as f:
+        for line in f:
+            try:
+                r = json.loads(line)
+            except Exception:
+                continue
+            if r.get("ig") != ig_username or r.get("status") != "ok":
+                continue
+            try:
+                t = datetime.strptime(r["time"], "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                continue
+            if t >= cutoff:
+                best = r
+    return best["url"] if best else None
+
+
 def run(ig_username: str, target: str = None):
     """
     target 格式：
@@ -252,6 +279,34 @@ def run(ig_username: str, target: str = None):
       <rpid>    → 回复 B站评论
       None      → 不自动回复
     """
+    fan_label = None
+    uid_val = None
+    if target and target.startswith("dm:"):
+        parts = target[3:].split(":", 1)
+        uid_val = parts[0]
+        fan_label = parts[1].replace("_", " ") if len(parts) > 1 else uid_val
+
+    cached_url = _lookup_cached_url(ig_username)
+    if cached_url:
+        tg.send(f"💾 @{ig_username} 7天内已上传过，复用现有链接...")
+        if target:
+            if target.startswith("dm:"):
+                _send_dm_reply(uid_val, ig_username, cached_url)
+            else:
+                rpid = target
+                context = _lookup_pending(rpid)
+                oid = context.get("oid")
+                if oid:
+                    reply_msg = f"兄弟！这是 @{ig_username} 的视频合集（7天有效）：{cached_url}\n转存哦！方便以后再看"
+                    ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
+                    fan_label = context.get("uname", "粉丝")
+                    tg.send(f"✅ 已在 B站回复 {fan_label}" if ok else "⚠️ B站回复失败（链接已生成）")
+        recipient = fan_label or "（无指定接收人）"
+        tg.send(f"✅ 分享完成（缓存）！\n👤 分享给：{recipient}\n📦 @{ig_username} 合集\n🔗 {cached_url}", no_preview=True)
+        if not target:
+            tg.send(f"兄弟！这是 @{ig_username} 的视频合集（7天有效）：{cached_url}\n转存哦！方便以后再看", no_preview=True)
+        return
+
     tg.send(f"🚀 开始处理 @{ig_username} 的合集分享请求...")
 
     try:
@@ -266,11 +321,6 @@ def run(ig_username: str, target: str = None):
         tg.send(f"❌ 下载出错：{e}")
         return
 
-    fan_label = None
-    if target and target.startswith("dm:"):
-        parts = target[3:].split(":", 1)
-        uid_val = parts[0]
-        fan_label = parts[1].replace("_", " ") if len(parts) > 1 else uid_val
     try:
         video_paths = _upscale_bitrate(video_paths)
         zip_path = _zip_videos(video_paths, ig_username, uid=fan_label)
