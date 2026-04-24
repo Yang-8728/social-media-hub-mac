@@ -142,6 +142,12 @@ def main():
                                     except Exception as e:
                                         tg.send(f"❌ /share 出错: {e}")
                                 threading.Thread(target=_do_share, daemon=True).start()
+                            elif text.startswith("/share "):
+                                ig_user = text.split()[1]
+                                def _do_share_ig(u=uid, n=uname, ig=ig_user):
+                                    safe_uname = n.replace(" ", "_")
+                                    quark_share.run(ig, f"dm:{u}:{safe_uname}")
+                                threading.Thread(target=_do_share_ig, daemon=True).start()
                             else:
                                 def _do_dm(t=text, u=uid, n=uname):
                                     from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
