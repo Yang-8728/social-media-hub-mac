@@ -384,6 +384,8 @@ _CHAPTER_RE = re.compile(r'^\d{1,2}:\d{2}[ \t]+(\S+)', re.MULTILINE)
 _IG_NAME_RE = re.compile(r'^([A-Za-z0-9._]{3,30})$', re.MULTILINE)
 # 匹配两个单词组成的名字，如 "mckinley bethel"
 _IG_FUZZY_RE = re.compile(r'(?<![A-Za-z0-9])([A-Za-z0-9]{2,20})\s+([A-Za-z0-9]{2,20})(?![A-Za-z0-9])')
+# 匹配嵌在中文里的英文账号，如 "大神surfsterre 的合集"
+_IG_EMBED_RE = re.compile(r'(?<![A-Za-z0-9._])([A-Za-z0-9][A-Za-z0-9._]{2,28}[A-Za-z0-9])(?![A-Za-z0-9._])')
 
 def _resolve_ig_username(raw: str) -> str | None:
     """把可能带空格的名字尝试各种连接符，返回第一个存在的 IG 用户名，找不到返回 None。"""
@@ -438,6 +440,14 @@ def _extract_ig_from_history(history: list) -> list:
                 resolved = _resolve_ig_username(raw)
                 if resolved and resolved not in names:
                     names.append(resolved)
+    if not names:
+        for h in history:
+            if h.get("from_me"):
+                continue
+            for m in _IG_EMBED_RE.finditer(h.get("text", "")):
+                name = m.group(1)
+                if name not in names:
+                    names.append(name)
     return names
 
 
