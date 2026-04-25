@@ -700,12 +700,12 @@ def _process_items(items, offline_prefix=""):
                 if sub_msg:
                     tg.send_md(sub_msg, no_preview=True)
 
-            elif item.get("type") == "dm" and not offline_prefix:
+            elif item.get("type") == "dm":
                 dm_uid   = item.get("uid")
                 dm_uname = item.get("uname", str(dm_uid))
                 ig_names = _extract_ig_from_history(item.get("history", []))
                 ig_detected = ig_names[0] if ig_names else None
-                mid = tg.send_md(msg + "\n\n_💬 直接回复此消息即可发送私信_", no_preview=True)
+                mid = tg.send_md(prefix_md + msg + "\n\n_💬 直接回复此消息即可发送私信_", no_preview=True)
                 if mid and dm_uid:
                     register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)
 
