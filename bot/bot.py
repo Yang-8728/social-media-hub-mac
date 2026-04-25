@@ -14,6 +14,7 @@ import pipelines.quark_share as quark_share
 import pipelines.youtube_to_wechat as wechat_pipeline
 from bot.handlers import bilibili_comments
 from bot.handlers.bilibili_comments import add_keyword
+from bot import notification_tracker as nt
 
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -36,6 +37,20 @@ def _queue_dispatcher():
             time.sleep(0.2)
 
 
+# ── 每小时扫描未处理通知 ──────────────────────────────────────────────────────
+
+def _pending_scanner():
+    """每小时检查最近 1 小时内未处理的通知，有则发引用提醒。"""
+    while True:
+        time.sleep(3600)
+        pending = nt.get_pending(hours=1)
+        if not pending:
+            continue
+        tg.send(f"⏰ 有 {len(pending)} 条消息还未处理：")
+        for item in pending:
+            tg.send("👆 点击引用跳转", reply_to_message_id=item["mid"])
+
+
 # ── 获取 Telegram updates ─────────────────────────────────────────────────────
 
 def _get_updates(offset=None):
@@ -55,6 +70,7 @@ def _handle_callback(cq: dict):
     if data.startswith("share:"):
         _, uid, ig = data.split(":", 2)
         tg.answer_callback(cq_id, "⏳ 正在处理...")
+        nt.resolve(orig_mid)
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
         def _do(u=uid, n=uname, ig_=ig):
@@ -63,6 +79,7 @@ def _handle_callback(cq: dict):
 
     elif data.startswith("reply_c:"):
         _, oid, rpid = data.split(":")
+        nt.resolve(orig_mid)
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
@@ -81,6 +98,7 @@ def _handle_callback(cq: dict):
         parts = data.split(":")
         oid, rpid, uid = parts[1], parts[2], parts[3]
         tg.answer_callback(cq_id, "🗑️ 删除中...")
+        nt.resolve(orig_mid)
         def _do(_oid=oid, _rpid=rpid, _uid=uid):
             from bot.handlers.bilibili_comments import (
                 _delete_comment, _blacklist_user, add_keyword, _lookup_pending_by_rpid)
@@ -95,6 +113,7 @@ def _handle_callback(cq: dict):
 
     elif data.startswith("skip:"):
         tg.answer_callback(cq_id, "⏭️ 已跳过")
+        nt.resolve(orig_mid)
 
     else:
         tg.answer_callback(cq_id)
@@ -107,6 +126,7 @@ def main():
 
     # 后台线程
     threading.Thread(target=_queue_dispatcher, daemon=True).start()
+    threading.Thread(target=_pending_scanner, daemon=True).start()
     if not os.environ.get("NO_MONITOR"):
         threading.Thread(target=bilibili_comments.run, daemon=True).start()
 
@@ -167,6 +187,7 @@ def main():
                     target = bilibili_comments.lookup_reply_target(reply_mid)
                     print(f"[reply] mid={reply_mid} target={'found' if target else 'not found'}", flush=True)
                     if target:
+                        nt.resolve(reply_mid)
                         if iq.has_pending() and target["type"] == "comment" and text.strip() in ("0", "1", "y"):
                             # Reply to an uncertain-question message: treat as IQ answer
                             iq.resolve(text)

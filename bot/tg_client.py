@@ -26,7 +26,8 @@ def inline_keyboard(buttons: list[list[tuple[str, str]]]) -> dict:
     }
 
 
-def send(text: str, markdown=False, no_preview=False, reply_markup=None) -> int | None:
+def send(text: str, markdown=False, no_preview=False, reply_markup=None,
+         reply_to_message_id: int = None) -> int | None:
     payload = {"chat_id": CHAT_ID, "text": text}
     if markdown:
         payload["parse_mode"] = "MarkdownV2"
@@ -34,6 +35,9 @@ def send(text: str, markdown=False, no_preview=False, reply_markup=None) -> int 
         payload["link_preview_options"] = {"is_disabled": True}
     if reply_markup:
         payload["reply_markup"] = reply_markup
+    if reply_to_message_id:
+        payload["reply_to_message_id"] = reply_to_message_id
+        payload["allow_sending_without_reply"] = True
     try:
         r = requests.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10)
         return r.json().get("result", {}).get("message_id")

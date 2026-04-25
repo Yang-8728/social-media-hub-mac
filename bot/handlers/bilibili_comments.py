@@ -676,6 +676,8 @@ def _process_items(items, offline_prefix=""):
             mid = tg.send_md(plain_md, no_preview=True, reply_markup=markup)
             if mid and oid2 and rpid2:
                 register_reply_target(mid, oid2, rpid2, raw_uname)
+                from bot import notification_tracker as nt
+                nt.record(mid, f"❓评论 {raw_uname}")
             sub_msg = _scan_sub_replies(oid2, rpid2)
             if sub_msg:
                 tg.send_md(sub_msg)
@@ -693,6 +695,8 @@ def _process_items(items, offline_prefix=""):
                 mid = tg.send_md(prefix_md + msg, no_preview=True, reply_markup=markup)
                 if mid and oid2 and rpid2:
                     register_reply_target(mid, oid2, rpid2, item.get("uname", ""))
+                    from bot import notification_tracker as nt
+                    nt.record(mid, f"💬评论 {item.get('uname','')}")
                 sub_msg = _scan_sub_replies(oid2, rpid2)
                 if sub_msg:
                     tg.send_md(sub_msg, no_preview=True)
@@ -710,6 +714,8 @@ def _process_items(items, offline_prefix=""):
                                   no_preview=True, reply_markup=markup)
                 if mid and dm_uid:
                     register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)
+                    from bot import notification_tracker as nt
+                    nt.record(mid, f"✉️私信 {dm_uname}")
 
             else:
                 tg.send_md(prefix_md + msg, no_preview=True)
