@@ -145,6 +145,15 @@ def _save_pending(item: dict):
     except Exception as e:
         print(f"[bilibili_comments] _save_pending 失败: {e}", flush=True)
 
+def _lookup_pending_by_rpid(rpid: str) -> dict:
+    try:
+        if os.path.exists(PENDING_FILE):
+            data = json.load(open(PENDING_FILE))
+            return data.get(str(rpid), {})
+    except Exception:
+        pass
+    return {}
+
 # ── 垃圾检测 ──────────────────────────────────────────────────────────────────
 
 _NORMALIZE_RE = re.compile(r'[!！@#$%^&*()【】\[\]{}<>|\\/:;\'",.\s]')
@@ -652,34 +661,21 @@ def _process_items(items, offline_prefix=""):
             bvid2       = item.get("bvid", "")
             comment_url2 = (f"https://www.bilibili.com/video/{bvid2}?comment_root_id={rpid2}"
                             if bvid2 and rpid2 else "")
-            plain = f"💬 {raw_uname} 评论了你的视频"
+            plain_md = f"❓ *{tg.esc(raw_uname)}* 评论了你的视频"
             if raw_title:
-                plain += f"\n🎬 《{raw_title}》"
-            plain += f"\n📝 {raw_content}"
+                plain_md += f"\n🎬 《{tg.esc(raw_title)}》"
+            plain_md += f"\n📝 {tg.esc(raw_content)}"
             if comment_url2:
-                plain += f"\n🔗 {comment_url2}"
-            ask_msg = (plain + f"\n\n⚠️ {uncertain_reason}，判断不了"
-                       f"\n❓ 垃圾？1 删除+拉黑+加词库，0 跳过，Reply 直接回复")
-            ev = threading.Event()
-            def _unc_cb(ans, _oid=oid2, _rpid=rpid2, _uid=uid2, _content=content, _ev=ev):
-                ans = ans.strip()
-                if ans in ("y", "1"):
-                    ok = _delete_comment(_oid, _rpid)
-                    _blacklist_user(_uid) if ok and _uid else None
-                    if ok:
-                        add_keyword(_content)
-                        tg.send(f"✅ 已删除+已拉黑，关键词「{_content[:50]}」已加入词库")
-                    else:
-                        tg.send("❌ 删除失败")
-                else:
-                    tg.send("⏭ 已跳过")
-                _ev.set()
-            _oid2, _rpid2, _uname2 = oid2, rpid2, item.get("uname", "")
-            def _on_sent(mid, _o=_oid2, _r=_rpid2, _u=_uname2):
-                register_reply_target(mid, _o, _r, _u)
-            iq.push(ask_msg, _unc_cb, on_sent=_on_sent, no_preview=True)
-            ev.wait()
-            ev.clear()
+                plain_md += f"\n🔗 {tg.link('查看评论', comment_url2)}"
+            plain_md += f"\n\n⚠️ {tg.esc(uncertain_reason)}，判断不了"
+            markup = tg.inline_keyboard([[
+                ("🗑️ 删除+拉黑", f"del_ban:{oid2}:{rpid2}:{uid2}"),
+                ("💬 回复", f"reply_c:{oid2}:{rpid2}"),
+                ("⏭️ 跳过", f"skip:{oid2}:{rpid2}"),
+            ]])
+            mid = tg.send_md(plain_md, no_preview=True, reply_markup=markup)
+            if mid and oid2 and rpid2:
+                register_reply_target(mid, oid2, rpid2, raw_uname)
             sub_msg = _scan_sub_replies(oid2, rpid2)
             if sub_msg:
                 tg.send_md(sub_msg)
@@ -693,7 +689,8 @@ def _process_items(items, offline_prefix=""):
             if is_comment and not offline_prefix:
                 oid2  = item.get("oid")
                 rpid2 = item.get("rpid")
-                mid = tg.send_md(prefix_md + msg, no_preview=True)
+                markup = tg.inline_keyboard([[("💬 回复", f"reply_c:{oid2}:{rpid2}")]])
+                mid = tg.send_md(prefix_md + msg, no_preview=True, reply_markup=markup)
                 if mid and oid2 and rpid2:
                     register_reply_target(mid, oid2, rpid2, item.get("uname", ""))
                 sub_msg = _scan_sub_replies(oid2, rpid2)
@@ -705,7 +702,12 @@ def _process_items(items, offline_prefix=""):
                 dm_uname = item.get("uname", str(dm_uid))
                 ig_names = _extract_ig_from_history(item.get("history", []))
                 ig_detected = ig_names[0] if ig_names else None
-                mid = tg.send_md(prefix_md + msg + "\n\n_💬 直接回复此消息即可发送私信_", no_preview=True)
+                if ig_detected:
+                    markup = tg.inline_keyboard([[("📤 发送合集", f"share:{dm_uid}:{ig_detected}")]])
+                else:
+                    markup = None
+                mid = tg.send_md(prefix_md + msg + "\n\n_💬 直接回复此消息即可发送私信_",
+                                  no_preview=True, reply_markup=markup)
                 if mid and dm_uid:
                     register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)
 

@@ -44,6 +44,62 @@ def _get_updates(offset=None):
     return resp.json().get("result", [])
 
 
+# ── Inline Button 回调处理 ────────────────────────────────────────────────────
+
+def _handle_callback(cq: dict):
+    data    = cq.get("data", "")
+    cq_id   = cq["id"]
+    orig_msg = cq.get("message", {})
+    orig_mid = orig_msg.get("message_id")
+
+    if data.startswith("share:"):
+        _, uid, ig = data.split(":", 2)
+        tg.answer_callback(cq_id, "⏳ 正在处理...")
+        target = bilibili_comments.lookup_reply_target(orig_mid)
+        uname  = target["uname"] if target else uid
+        def _do(u=uid, n=uname, ig_=ig):
+            quark_share.run(ig_, f"dm:{u}:{n.replace(' ','_')}")
+        threading.Thread(target=_do, daemon=True).start()
+
+    elif data.startswith("reply_c:"):
+        _, oid, rpid = data.split(":")
+        target = bilibili_comments.lookup_reply_target(orig_mid)
+        uname  = target["uname"] if target else "?"
+        orig_text = orig_msg.get("text", "")
+        # 截取评论内容作为引用预览
+        lines = [l for l in orig_text.splitlines() if l.startswith("📝")]
+        preview = lines[0][2:].strip()[:40] if lines else ""
+        tg.answer_callback(cq_id)
+        prompt = f"💬 回复 *{tg.esc(uname)}*"
+        if preview:
+            prompt += f"：{tg.esc(preview)}"
+        force_mid = tg.send_force_reply(prompt, markdown=True)
+        if force_mid and oid and rpid:
+            bilibili_comments.register_reply_target(force_mid, int(oid), int(rpid), uname)
+
+    elif data.startswith("del_ban:"):
+        parts = data.split(":")
+        oid, rpid, uid = parts[1], parts[2], parts[3]
+        tg.answer_callback(cq_id, "🗑️ 删除中...")
+        def _do(_oid=oid, _rpid=rpid, _uid=uid):
+            from bot.handlers.bilibili_comments import (
+                _delete_comment, _blacklist_user, add_keyword, _lookup_pending_by_rpid)
+            ok = _delete_comment(int(_oid), int(_rpid))
+            bl = _blacklist_user(int(_uid)) if ok and _uid else False
+            pending = _lookup_pending_by_rpid(_rpid)
+            if ok and pending:
+                add_keyword(pending.get("content", ""))
+            status = "✅ 已删除" + ("＋已拉黑" if bl else "")
+            tg.send(status if ok else "❌ 删除失败")
+        threading.Thread(target=_do, daemon=True).start()
+
+    elif data.startswith("skip:"):
+        tg.answer_callback(cq_id, "⏭️ 已跳过")
+
+    else:
+        tg.answer_callback(cq_id)
+
+
 # ── 主循环 ────────────────────────────────────────────────────────────────────
 
 def main():
@@ -70,6 +126,12 @@ def main():
             updates = _get_updates(offset)
             for update in updates:
                 offset = update["update_id"] + 1
+
+                # ── Inline button 回调 ────────────────────────────────────────
+                if "callback_query" in update:
+                    _handle_callback(update["callback_query"])
+                    continue
+
                 msg    = update.get("message", {})
 
                 chat    = msg.get("chat", {})
