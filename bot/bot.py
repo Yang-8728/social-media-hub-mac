@@ -163,7 +163,25 @@ def main():
                                 iq.resolve("0")
                         continue
                     else:
-                        tg.send("⚠️ 找不到对应的评论/私信目标，可能已超出记录范围")
+                        # 尝试从通知消息文本里解析 UID 和 IG 账号，兜底处理离线期间未注册的消息
+                        import re as _re
+                        replied_text = reply_to.get("text", "") or reply_to.get("caption", "") or ""
+                        uid_m = _re.search(r'UID[：:]\s*(\d+)', replied_text)
+                        ig_m  = _re.search(r'IG 账号[：:`]+\s*([A-Za-z0-9._]{3,30})', replied_text)
+                        if uid_m and (text.strip() == "/share" or text.startswith("/share ")):
+                            uid_val  = uid_m.group(1)
+                            uname_m  = _re.search(r'✉️\s*(.+?)（UID', replied_text)
+                            uname_fb = uname_m.group(1).strip() if uname_m else uid_val
+                            ig_user  = text.split()[1] if text.startswith("/share ") else (ig_m.group(1) if ig_m else None)
+                            if ig_user:
+                                bilibili_comments.register_dm_target(reply_mid, int(uid_val), uname_fb, ig_username=ig_user)
+                                def _do_share_fb(u=uid_val, n=uname_fb, ig=ig_user):
+                                    quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
+                                threading.Thread(target=_do_share_fb, daemon=True).start()
+                            else:
+                                tg.send("⚠️ 未能从消息中识别 IG 账号，请用 /share ig账号名 重试")
+                        else:
+                            tg.send("⚠️ 找不到对应的评论/私信目标，可能已超出记录范围")
                         continue
 
                 # ── 交互回复（队列等待中）────────────────────────────────────
