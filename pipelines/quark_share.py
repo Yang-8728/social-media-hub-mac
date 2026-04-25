@@ -23,7 +23,7 @@ SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
 def _fan_msg(ig_username: str, share_url: str) -> str:
     return (
         f"兄弟！这是 @{ig_username} 的视频合集，复制下面链接，"
-        f"再粘贴到浏览器中就能打开夸克网盘了：\n{share_url}\n转存哦！方便以后再看"
+        f"再粘贴到浏览器中就能打开夸克网盘了：\n{share_url}\n然后在夸克网盘中转存哦，方便以后再开"
     )
 
 
