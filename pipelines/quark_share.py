@@ -20,6 +20,13 @@ SHARE_LOG     = PROJECT_DIR / "logs" / "quark_shares.jsonl"
 SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
 
 
+def _fan_msg(ig_username: str, share_url: str) -> str:
+    return (
+        f"兄弟！这是 @{ig_username} 的视频合集，复制下面链接，"
+        f"再粘贴到浏览器中就能打开夸克网盘了：\n{share_url}\n转存哦！方便以后再看"
+    )
+
+
 def _write_log(ig_username: str, fan_uname: str, fan_uid: str,
                video_count: int, share_url: str, status: str):
     record = {
@@ -235,7 +242,7 @@ def _send_dm_reply(uid: str, ig_username: str, share_url: str):
     try:
         sess = get_bilibili_session()
         csrf = get_csrf(sess)
-        msg = f"兄弟！这是 @{ig_username} 的视频合集：{share_url}\n转存哦！方便以后再看"
+        msg = _fan_msg(ig_username, share_url)
         ok = send_dm(sess, csrf, int(uid), msg)
         if ok:
             tg.send(f"✅ 已通过私信发送链接给 UID {uid}")
@@ -297,14 +304,14 @@ def run(ig_username: str, target: str = None):
                 context = _lookup_pending(rpid)
                 oid = context.get("oid")
                 if oid:
-                    reply_msg = f"兄弟！这是 @{ig_username} 的视频合集：{cached_url}\n转存哦！方便以后再看"
+                    reply_msg = _fan_msg(ig_username, cached_url)
                     ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
                     fan_label = context.get("uname", "粉丝")
                     tg.send(f"✅ 已在 B站回复 {fan_label}" if ok else "⚠️ B站回复失败（链接已生成）")
         recipient = fan_label or "（无指定接收人）"
         tg.send(f"✅ 分享完成（缓存）！\n👤 分享给：{recipient}\n📦 @{ig_username} 合集\n🔗 {cached_url}", no_preview=True)
         if not target:
-            tg.send(f"兄弟！这是 @{ig_username} 的视频合集：{cached_url}\n转存哦！方便以后再看", no_preview=True)
+            tg.send(_fan_msg(ig_username, cached_url), no_preview=True)
         return
 
     tg.send(f"🚀 开始处理 @{ig_username} 的合集分享请求...")
@@ -354,7 +361,7 @@ def run(ig_username: str, target: str = None):
             context = _lookup_pending(rpid)
             oid = context.get("oid")
             if oid:
-                reply_msg = f"兄弟！这是 @{ig_username} 的视频合集：{share_url}\n转存哦！方便以后再看"
+                reply_msg = _fan_msg(ig_username, share_url)
                 ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
                 fan_uname = context.get("uname", "粉丝")
                 fan_label = fan_uname
@@ -365,7 +372,7 @@ def run(ig_username: str, target: str = None):
     import datetime
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     recipient = fan_label if fan_label else "（无指定接收人）"
-    share_msg = f"兄弟！这是 @{ig_username} 的视频合集：{share_url}\n转存哦！方便以后再看"
+    share_msg = _fan_msg(ig_username, share_url)
     done_msg = (
         f"✅ 分享完成！\n"
         f"👤 分享给：{recipient}\n"
