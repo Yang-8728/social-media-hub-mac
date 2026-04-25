@@ -706,11 +706,11 @@ def _process_items(items, offline_prefix=""):
                 dm_uname = item.get("uname", str(dm_uid))
                 ig_names = _extract_ig_from_history(item.get("history", []))
                 ig_detected = ig_names[0] if ig_names else None
+                btn_row = [("💬 回复", f"reply_dm:{dm_uid}")]
                 if ig_detected:
-                    markup = tg.inline_keyboard([[("📤 发送合集", f"share:{dm_uid}:{ig_detected}")]])
-                else:
-                    markup = None
-                mid = tg.send_md(prefix_md + msg + "\n\n_💬 直接回复此消息即可发送私信_",
+                    btn_row.insert(0, ("📤 发送合集", f"share:{dm_uid}:{ig_detected}"))
+                markup = tg.inline_keyboard([btn_row])
+                mid = tg.send_md(prefix_md + msg,
                                   no_preview=True, reply_markup=markup)
                 if mid and dm_uid:
                     register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)

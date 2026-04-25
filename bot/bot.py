@@ -94,6 +94,17 @@ def _handle_callback(cq: dict):
         if force_mid and oid and rpid:
             bilibili_comments.register_reply_target(force_mid, int(oid), int(rpid), uname)
 
+    elif data.startswith("reply_dm:"):
+        _, uid = data.split(":", 1)
+        nt.resolve(orig_mid)
+        target = bilibili_comments.lookup_reply_target(orig_mid)
+        uname  = target["uname"] if target else uid
+        tg.answer_callback(cq_id)
+        prompt = f"💬 私信回复 *{tg.esc(uname)}*"
+        force_mid = tg.send_force_reply(prompt, markdown=True)
+        if force_mid:
+            bilibili_comments.register_dm_target(force_mid, int(uid), uname)
+
     elif data.startswith("del_ban:"):
         parts = data.split(":")
         oid, rpid, uid = parts[1], parts[2], parts[3]
