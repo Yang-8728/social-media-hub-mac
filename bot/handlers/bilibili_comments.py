@@ -506,7 +506,7 @@ def _format_fan(item: dict) -> str | None:
             msg += "\n\n*历史消息：*"
             for h in history[-10:]:
                 who = "➡️ 我" if h["from_me"] else f"👤 {uname}"
-                msg += f"\n{who}：{tg.esc(h['text'][:80])}"
+                msg += f"\n{who}：{tg.esc(h['text'])}"
         # 检测历史消息里是否含章节格式（时间戳 + IG账号名）
         ig_names = _extract_ig_from_history(history)
         if ig_names:
