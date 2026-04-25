@@ -309,9 +309,15 @@ def run(ig_username: str, target: str = None):
                     fan_label = context.get("uname", "粉丝")
                     tg.send(f"✅ 已在 B站回复 {fan_label}" if ok else "⚠️ B站回复失败（链接已生成）")
         recipient = fan_label or "（无指定接收人）"
-        tg.send(f"✅ 分享完成（缓存）！\n👤 分享给：{recipient}\n📦 @{ig_username} 合集\n🔗 {cached_url}", no_preview=True)
-        if not target:
-            tg.send(_fan_msg(ig_username, cached_url), no_preview=True)
+        fan_text = _fan_msg(ig_username, cached_url)
+        done_msg = (
+            f"✅ 分享完成（缓存）！\n"
+            f"👤 分享给：{recipient}\n"
+            f"📦 @{ig_username} 合集\n"
+            f"🔗 {cached_url}\n\n"
+            f"— 发给粉丝的消息 —\n{fan_text}"
+        )
+        tg.send(done_msg, no_preview=True)
         return
 
     tg.send(f"🚀 开始处理 @{ig_username} 的合集分享请求...")
@@ -372,17 +378,16 @@ def run(ig_username: str, target: str = None):
     import datetime
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     recipient = fan_label if fan_label else "（无指定接收人）"
-    share_msg = _fan_msg(ig_username, share_url)
+    fan_text = _fan_msg(ig_username, share_url)
     done_msg = (
         f"✅ 分享完成！\n"
         f"👤 分享给：{recipient}\n"
         f"📦 @{ig_username} 合集（{len(video_paths)} 个视频）\n"
         f"🕐 时间：{now_str}\n"
-        f"🔗 {share_url}"
+        f"🔗 {share_url}\n\n"
+        f"— 发给粉丝的消息 —\n{fan_text}"
     )
     tg.send(done_msg, no_preview=True)
-    if not target:
-        tg.send(share_msg, no_preview=True)
 
     _write_log(
         ig_username=ig_username,
