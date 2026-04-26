@@ -67,6 +67,8 @@ def _load_custom_keywords() -> list:
     return []
 
 def add_keyword(kw: str):
+    if not kw or not kw.strip():
+        return _load_custom_keywords()
     kws = _load_custom_keywords()
     if kw not in kws:
         kws.append(kw)
