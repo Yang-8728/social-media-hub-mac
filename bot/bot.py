@@ -193,15 +193,21 @@ def main():
                                 threading.Thread(target=_do_reply_g, daemon=True).start()
                             elif target["type"] == "dm":
                                 uid_g, uname_g = target["uid"], target["uname"]
-                                def _do_dm_g(t=text_g, u=uid_g, n=uname_g):
-                                    from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
-                                    try:
-                                        sess = get_bilibili_session()
-                                        ok = send_dm(sess, get_csrf(sess), int(u), t)
-                                        tg.send(f"✅ 私信已发给 {n}" if ok else "❌ 发送失败")
-                                    except Exception as e:
-                                        tg.send(f"❌ 发送失败: {e}")
-                                threading.Thread(target=_do_dm_g, daemon=True).start()
+                                if text_g.startswith("/share "):
+                                    ig_user_g = text_g.split()[1]
+                                    def _do_share_g(u=uid_g, n=uname_g, ig=ig_user_g):
+                                        quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
+                                    threading.Thread(target=_do_share_g, daemon=True).start()
+                                else:
+                                    def _do_dm_g(t=text_g, u=uid_g, n=uname_g):
+                                        from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
+                                        try:
+                                            sess = get_bilibili_session()
+                                            ok = send_dm(sess, get_csrf(sess), int(u), t)
+                                            tg.send(f"✅ 私信已发给 {n}" if ok else "❌ 发送失败")
+                                        except Exception as e:
+                                            tg.send(f"❌ 发送失败: {e}")
+                                    threading.Thread(target=_do_dm_g, daemon=True).start()
                     elif text_g.startswith("/dm "):
                         parts_g = text_g.split(None, 1)
                         uid_str_g = parts_g[1].strip() if len(parts_g) > 1 else ""
