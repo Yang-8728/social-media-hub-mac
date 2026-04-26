@@ -59,8 +59,9 @@ def _send_raw(chat_id, text: str, markdown=False, no_preview=False,
 
 def send(text: str, markdown=False, no_preview=False, reply_markup=None,
          reply_to_message_id: int = None) -> int | None:
-    return _send_raw(CHAT_ID, text, markdown=markdown, no_preview=no_preview,
-                     reply_markup=reply_markup, reply_to_message_id=reply_to_message_id)
+    return _send_raw(GROUP_CHAT_ID, text, markdown=markdown, no_preview=no_preview,
+                     reply_markup=reply_markup, reply_to_message_id=reply_to_message_id,
+                     thread_id=TOPIC_SYSTEM)
 
 
 def send_md(text: str, no_preview=False, reply_markup=None) -> int | None:
@@ -92,7 +93,7 @@ def answer_callback(callback_query_id: str, text: str = "") -> None:
 def send_force_reply(text: str, markdown=False, chat_id=None, thread_id: int = None) -> int | None:
     """发一条带 ForceReply 的消息，让用户进入引用回复模式。"""
     payload = {
-        "chat_id": chat_id or CHAT_ID,
+        "chat_id": chat_id or GROUP_CHAT_ID,
         "text": text,
         "reply_markup": {"force_reply": True, "input_field_placeholder": "输入回复内容..."},
     }
