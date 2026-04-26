@@ -55,7 +55,8 @@ def _pending_scanner():
 
 def _get_updates(offset=None):
     resp = requests.get(f"{BASE_URL}/getUpdates",
-                        params={"timeout": 30, "offset": offset}, timeout=35)
+                        params={"timeout": 30, "offset": offset}, timeout=35,
+                        proxies={"http": None, "https": None})
     return resp.json().get("result", [])
 
 

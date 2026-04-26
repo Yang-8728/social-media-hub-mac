@@ -49,7 +49,8 @@ def _send_raw(chat_id, text: str, markdown=False, no_preview=False,
     if thread_id:
         payload["message_thread_id"] = thread_id
     try:
-        r = requests.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10)
+        r = requests.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10,
+                          proxies={"http": None, "https": None})
         return r.json().get("result", {}).get("message_id")
     except Exception as e:
         print(f"[TG] 发送失败: {e}")
@@ -82,7 +83,8 @@ def send_topic_md(thread_id: int, text: str, no_preview=False,
 def answer_callback(callback_query_id: str, text: str = "") -> None:
     try:
         requests.post(f"{BASE_URL}/answerCallbackQuery",
-                      json={"callback_query_id": callback_query_id, "text": text}, timeout=5)
+                      json={"callback_query_id": callback_query_id, "text": text}, timeout=5,
+                      proxies={"http": None, "https": None})
     except Exception:
         pass
 
@@ -99,7 +101,8 @@ def send_force_reply(text: str, markdown=False, chat_id=None, thread_id: int = N
     if thread_id:
         payload["message_thread_id"] = thread_id
     try:
-        r = requests.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10)
+        r = requests.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10,
+                          proxies={"http": None, "https": None})
         return r.json().get("result", {}).get("message_id")
     except Exception as e:
         print(f"[TG] force_reply 发送失败: {e}")
