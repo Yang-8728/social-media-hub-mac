@@ -177,10 +177,10 @@ def main():
 
                 # 群组话题回复处理
                 if chat.get("id") == tg.GROUP_CHAT_ID:
+                    text_g = msg.get("text", "").strip()
                     reply_to = msg.get("reply_to_message", {})
                     if reply_to:
                         reply_mid = reply_to.get("message_id")
-                        text_g = msg.get("text", "").strip()
                         target = bilibili_comments.lookup_reply_target(reply_mid)
                         if target and text_g:
                             nt.resolve(reply_mid)
@@ -202,6 +202,22 @@ def main():
                                     except Exception as e:
                                         tg.send(f"❌ 发送失败: {e}")
                                 threading.Thread(target=_do_dm_g, daemon=True).start()
+                    elif text_g.startswith("/dm "):
+                        parts_g = text_g.split(None, 1)
+                        uid_str_g = parts_g[1].strip() if len(parts_g) > 1 else ""
+                        if uid_str_g.isdigit():
+                            _uname_g = uid_str_g
+                            for v in bilibili_comments._load_reply_targets().values():
+                                if str(v.get("uid")) == uid_str_g and v.get("type") == "dm":
+                                    _uname_g = v.get("uname", uid_str_g)
+                                    break
+                            prompt_g = f"💬 私信回复 {_uname_g}（UID {uid_str_g}）"
+                            thread_id_g = msg.get("message_thread_id")
+                            force_mid_g = tg.send_force_reply(prompt_g, chat_id=tg.GROUP_CHAT_ID, thread_id=thread_id_g)
+                            if force_mid_g:
+                                bilibili_comments.register_dm_target(force_mid_g, int(uid_str_g), _uname_g)
+                        else:
+                            tg.send_topic(msg.get("message_thread_id") or tg.TOPIC_SYSTEM, "用法：/dm <B站UID>")
                     continue
 
                 # 陌生人私信 → 转发给自己
