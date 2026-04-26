@@ -1,7 +1,7 @@
 """
 粉丝视频分享：下载IG视频 → 打包zip → 上传夸克 → 生成分享链接 → 回复B站评论。
 """
-import os, sys, json, time, zipfile, requests, shutil
+import os, sys, json, time, zipfile, requests, shutil, threading
 from datetime import datetime
 from pathlib import Path
 
@@ -9,6 +9,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bot import tg_client as tg
 from platforms.quark.api import QuarkClient
+
+_ctx = threading.local()
+
+def _send(text, **kwargs):
+    tid = getattr(_ctx, "thread_id", tg.TOPIC_SYSTEM)
+    tg.send_topic(tid, text, **kwargs)
 
 PROJECT_DIR   = Path(__file__).resolve().parents[1]
 COOKIE_FILE   = PROJECT_DIR / "temp" / "bili_cookies_ai_vanvan.json"
@@ -69,7 +75,7 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
 
     loader = _get_ig_loader()
 
-    tg.send(f"📥 正在获取 @{ig_username} 的视频列表，下载中...")
+    _send(f"📥 正在获取 @{ig_username} 的视频列表，下载中...")
     profile = Profile.from_username(loader.context, ig_username)
 
     video_paths = []
@@ -100,7 +106,7 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
                 break
             time.sleep(1)
         except Exception as e:
-            tg.send(f"⚠️ 下载 {post.shortcode} 失败: {e}")
+            _send(f"⚠️ 下载 {post.shortcode} 失败: {e}")
 
     if not video_paths:
         raise RuntimeError(f"@{ig_username} 没有可下载的视频")
@@ -144,7 +150,7 @@ def _upscale_bitrate(video_paths: list) -> list:
     if video_bps <= 0:
         return video_paths
 
-    tg.send(f"🔧 视频总大小 {total_bytes/1024/1024:.1f}MB < 200MB，正在升码率至约 210MB...")
+    _send(f"🔧 视频总大小 {total_bytes/1024/1024:.1f}MB < 200MB，正在升码率至约 210MB...")
 
     new_paths = []
     for p in video_paths:
@@ -163,7 +169,7 @@ def _upscale_bitrate(video_paths: list) -> list:
         new_paths.append(p)
 
     new_total = sum(os.path.getsize(p) for p in new_paths)
-    tg.send(f"✅ 升码率完成：{new_total/1024/1024:.1f}MB")
+    _send(f"✅ 升码率完成：{new_total/1024/1024:.1f}MB")
     return new_paths
 
 
@@ -173,12 +179,12 @@ def _zip_videos(video_paths: list, ig_username: str, uid: str = None) -> str:
     date_str = datetime.now().strftime("%Y%m%d")
     name = f"{uid}_{ig_username}_{date_str}" if uid else f"{ig_username}_{date_str}"
     zip_path = str(PROJECT_DIR / "temp" / f"{name}.zip")
-    tg.send(f"📦 正在打包 {len(video_paths)} 个视频...")
+    _send(f"📦 正在打包 {len(video_paths)} 个视频...")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
         for vp in video_paths:
             zf.write(vp, os.path.basename(vp))
     size_mb = os.path.getsize(zip_path) / 1024 / 1024
-    tg.send(f"📦 打包完成：{size_mb:.1f}MB")
+    _send(f"📦 打包完成：{size_mb:.1f}MB")
     for vp in video_paths:
         try:
             os.remove(vp)
@@ -245,11 +251,11 @@ def _send_dm_reply(uid: str, ig_username: str, share_url: str):
         msg = _fan_msg(ig_username, share_url)
         ok = send_dm(sess, csrf, int(uid), msg)
         if ok:
-            tg.send(f"✅ 已通过私信发送链接给 UID {uid}")
+            _send(f"✅ 已通过私信发送链接给 UID {uid}")
         else:
-            tg.send(f"⚠️ 私信发送失败（链接已生成）")
+            _send(f"⚠️ 私信发送失败（链接已生成）")
     except Exception as e:
-        tg.send(f"⚠️ 私信发送出错：{e}（链接已生成）")
+        _send(f"⚠️ 私信发送出错：{e}（链接已生成）")
 
 
 CACHE_DAYS = 7
@@ -279,13 +285,17 @@ def _lookup_cached_url(ig_username: str) -> str | None:
     return best["url"] if best else None
 
 
-def run(ig_username: str, target: str = None):
+def run(ig_username: str, target: str = None, thread_id: int = None):
     """
     target 格式：
       dm:<uid>  → 回复 B站私信
       <rpid>    → 回复 B站评论
       None      → 不自动回复
     """
+    if thread_id is None:
+        thread_id = tg.TOPIC_DM if (target and target.startswith("dm:")) else tg.TOPIC_COMMENT
+    _ctx.thread_id = thread_id
+
     fan_label = None
     uid_val = None
     if target and target.startswith("dm:"):
@@ -295,7 +305,7 @@ def run(ig_username: str, target: str = None):
 
     cached_url = _lookup_cached_url(ig_username)
     if cached_url:
-        tg.send(f"💾 @{ig_username} 7天内已上传过，复用现有链接...")
+        _send(f"💾 @{ig_username} 7天内已上传过，复用现有链接...")
         if target:
             if target.startswith("dm:"):
                 _send_dm_reply(uid_val, ig_username, cached_url)
@@ -307,7 +317,7 @@ def run(ig_username: str, target: str = None):
                     reply_msg = _fan_msg(ig_username, cached_url)
                     ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
                     fan_label = context.get("uname", "粉丝")
-                    tg.send(f"✅ 已在 B站回复 {fan_label}" if ok else "⚠️ B站回复失败（链接已生成）")
+                    _send(f"✅ 已在 B站回复 {fan_label}" if ok else "⚠️ B站回复失败（链接已生成）")
         recipient = fan_label or "（无指定接收人）"
         fan_text = _fan_msg(ig_username, cached_url)
         done_msg = (
@@ -317,46 +327,46 @@ def run(ig_username: str, target: str = None):
             f"🔗 {cached_url}\n\n"
             f"— 发给粉丝的消息 —\n{fan_text}"
         )
-        tg.send(done_msg, no_preview=True)
+        _send(done_msg, no_preview=True)
         return
 
-    tg.send(f"🚀 开始处理 @{ig_username} 的合集分享请求...")
+    _send(f"🚀 开始处理 @{ig_username} 的合集分享请求...")
 
     try:
         video_paths = _download_ig_profile(ig_username)
     except PermissionError as e:
-        tg.send(f"❌ Instagram session 问题：{e}")
+        _send(f"❌ Instagram session 问题：{e}")
         return
     except RuntimeError as e:
-        tg.send(f"❌ 下载失败：{e}")
+        _send(f"❌ 下载失败：{e}")
         return
     except Exception as e:
-        tg.send(f"❌ 下载出错：{e}")
+        _send(f"❌ 下载出错：{e}")
         return
 
     try:
         video_paths = _upscale_bitrate(video_paths)
         zip_path = _zip_videos(video_paths, ig_username, uid=fan_label)
     except Exception as e:
-        tg.send(f"❌ 打包失败：{e}")
+        _send(f"❌ 打包失败：{e}")
         return
 
     try:
-        tg.send(f"☁️ 正在上传到夸克网盘「{QuarkClient().upload_folder}」...")
+        _send(f"☁️ 正在上传到夸克网盘「{QuarkClient().upload_folder}」...")
         client = QuarkClient()
         folder_fid = client.get_or_create_folder(client.upload_folder)
         fid, fid_token = client.upload(zip_path, folder_fid)
     except PermissionError as e:
-        tg.send(f"❌ 夸克Cookie已过期：{e}\n请更新 config/quark.json 中的 cookie")
+        _send(f"❌ 夸克Cookie已过期：{e}\n请更新 config/quark.json 中的 cookie")
         return
     except Exception as e:
-        tg.send(f"❌ 上传夸克失败：{e}")
+        _send(f"❌ 上传夸克失败：{e}")
         return
 
     try:
         share_url = client.create_share(fid, fid_token, title=f"{ig_username}合集")
     except Exception as e:
-        tg.send(f"❌ 创建分享链接失败：{e}")
+        _send(f"❌ 创建分享链接失败：{e}")
         return
 
     if target:
@@ -371,9 +381,9 @@ def run(ig_username: str, target: str = None):
                 ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
                 fan_uname = context.get("uname", "粉丝")
                 fan_label = fan_uname
-                tg.send(f"✅ 已在 B站回复 {fan_uname}" if ok else "⚠️ B站回复失败（继续，链接已生成）")
+                _send(f"✅ 已在 B站回复 {fan_uname}" if ok else "⚠️ B站回复失败（继续，链接已生成）")
             else:
-                tg.send(f"⚠️ 未找到 rpid={rpid} 的评论上下文，跳过回复")
+                _send(f"⚠️ 未找到 rpid={rpid} 的评论上下文，跳过回复")
 
     import datetime
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -387,7 +397,7 @@ def run(ig_username: str, target: str = None):
         f"🔗 {share_url}\n\n"
         f"— 发给粉丝的消息 —\n{fan_text}"
     )
-    tg.send(done_msg, no_preview=True)
+    _send(done_msg, no_preview=True)
 
     _write_log(
         ig_username=ig_username,
