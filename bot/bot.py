@@ -90,7 +90,10 @@ def _handle_callback(cq: dict):
         prompt = f"💬 回复 *{tg.esc(uname)}*"
         if preview:
             prompt += f"：{tg.esc(preview)}"
-        force_mid = tg.send_force_reply(prompt, markdown=True)
+        orig_thread = orig_msg.get("message_thread_id")
+        orig_chat   = orig_msg.get("chat", {}).get("id")
+        force_chat  = orig_chat if orig_chat == tg.GROUP_CHAT_ID else None
+        force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=orig_thread)
         if force_mid and oid and rpid:
             bilibili_comments.register_reply_target(force_mid, int(oid), int(rpid), uname)
 
@@ -101,7 +104,10 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else uid
         tg.answer_callback(cq_id)
         prompt = f"💬 私信回复 *{tg.esc(uname)}*"
-        force_mid = tg.send_force_reply(prompt, markdown=True)
+        orig_thread = orig_msg.get("message_thread_id")
+        orig_chat   = orig_msg.get("chat", {}).get("id")
+        force_chat  = orig_chat if orig_chat == tg.GROUP_CHAT_ID else None
+        force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=orig_thread)
         if force_mid:
             bilibili_comments.register_dm_target(force_mid, int(uid), uname)
 
@@ -167,6 +173,35 @@ def main():
 
                 chat    = msg.get("chat", {})
                 chat_id = str(chat.get("id"))
+
+                # 群组话题回复处理
+                if chat.get("id") == tg.GROUP_CHAT_ID:
+                    reply_to = msg.get("reply_to_message", {})
+                    if reply_to:
+                        reply_mid = reply_to.get("message_id")
+                        text_g = msg.get("text", "").strip()
+                        target = bilibili_comments.lookup_reply_target(reply_mid)
+                        if target and text_g:
+                            nt.resolve(reply_mid)
+                            if target["type"] == "comment":
+                                oid, rpid, uname = target["oid"], target["rpid"], target["uname"]
+                                def _do_reply_g(t=text_g, o=oid, r=rpid, u=uname):
+                                    from pipelines.quark_share import _reply_bilibili
+                                    ok = _reply_bilibili(o, r, t)
+                                    tg.send(f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                threading.Thread(target=_do_reply_g, daemon=True).start()
+                            elif target["type"] == "dm":
+                                uid_g, uname_g = target["uid"], target["uname"]
+                                def _do_dm_g(t=text_g, u=uid_g, n=uname_g):
+                                    from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
+                                    try:
+                                        sess = get_bilibili_session()
+                                        ok = send_dm(sess, get_csrf(sess), int(u), t)
+                                        tg.send(f"✅ 私信已发给 {n}" if ok else "❌ 发送失败")
+                                    except Exception as e:
+                                        tg.send(f"❌ 发送失败: {e}")
+                                threading.Thread(target=_do_dm_g, daemon=True).start()
+                    continue
 
                 # 陌生人私信 → 转发给自己
                 if chat_id != str(CHAT_ID):

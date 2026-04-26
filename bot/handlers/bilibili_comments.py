@@ -648,10 +648,10 @@ def _process_items(items, offline_prefix=""):
             )
             if comment_url:
                 msg += f"\n🔗 {tg.link('查看评论', comment_url)}"
-            tg.send_md(msg, no_preview=True)
+            tg.send_topic_md(tg.TOPIC_SPAM, msg, no_preview=True)
             sub_msg = _scan_sub_replies(oid, rpid)
             if sub_msg:
-                tg.send_md(sub_msg)
+                tg.send_topic_md(tg.TOPIC_SPAM, sub_msg)
 
         elif uncertain_reason and is_comment and not offline_prefix:
             oid2        = item.get("oid")
@@ -675,14 +675,14 @@ def _process_items(items, offline_prefix=""):
                 ("💬 回复", f"reply_c:{oid2}:{rpid2}"),
                 ("⏭️ 跳过", f"skip:{oid2}:{rpid2}"),
             ]])
-            mid = tg.send_md(plain_md, no_preview=True, reply_markup=markup)
+            mid = tg.send_topic_md(tg.TOPIC_COMMENT, plain_md, no_preview=True, reply_markup=markup)
             if mid and oid2 and rpid2:
                 register_reply_target(mid, oid2, rpid2, raw_uname)
                 from bot import notification_tracker as nt
                 nt.record(mid, f"❓评论 {raw_uname}")
             sub_msg = _scan_sub_replies(oid2, rpid2)
             if sub_msg:
-                tg.send_md(sub_msg)
+                tg.send_topic_md(tg.TOPIC_COMMENT, sub_msg)
 
         else:
             msg = _format_fan(item)
@@ -694,14 +694,14 @@ def _process_items(items, offline_prefix=""):
                 oid2  = item.get("oid")
                 rpid2 = item.get("rpid")
                 markup = tg.inline_keyboard([[("💬 回复", f"reply_c:{oid2}:{rpid2}")]])
-                mid = tg.send_md(prefix_md + msg, no_preview=True, reply_markup=markup)
+                mid = tg.send_topic_md(tg.TOPIC_COMMENT, prefix_md + msg, no_preview=True, reply_markup=markup)
                 if mid and oid2 and rpid2:
                     register_reply_target(mid, oid2, rpid2, item.get("uname", ""))
                     from bot import notification_tracker as nt
                     nt.record(mid, f"💬评论 {item.get('uname','')}")
                 sub_msg = _scan_sub_replies(oid2, rpid2)
                 if sub_msg:
-                    tg.send_md(sub_msg, no_preview=True)
+                    tg.send_topic_md(tg.TOPIC_COMMENT, sub_msg, no_preview=True)
 
             elif item.get("type") == "dm":
                 dm_uid   = item.get("uid")
@@ -712,8 +712,8 @@ def _process_items(items, offline_prefix=""):
                 if ig_detected:
                     btn_row.insert(0, ("📤 发送合集", f"share:{dm_uid}:{ig_detected}"))
                 markup = tg.inline_keyboard([btn_row])
-                mid = tg.send_md(prefix_md + msg,
-                                  no_preview=True, reply_markup=markup)
+                mid = tg.send_topic_md(tg.TOPIC_DM, prefix_md + msg,
+                                       no_preview=True, reply_markup=markup)
                 if mid and dm_uid:
                     register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)
                     from bot import notification_tracker as nt
