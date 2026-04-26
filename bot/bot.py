@@ -352,6 +352,23 @@ def main():
                     else:
                         tg.send("用法：/share ig用户名 [rpid]\nrpid 可从评论通知链接的 comment_root_id 参数获取")
 
+                elif text.startswith("/dm "):
+                    parts = text.split(None, 1)
+                    uid_str = parts[1].strip() if len(parts) > 1 else ""
+                    if uid_str.isdigit():
+                        # 尝试从 reply_targets 找昵称
+                        _uname = uid_str
+                        for v in bilibili_comments._load_reply_targets().values():
+                            if str(v.get("uid")) == uid_str and v.get("type") == "dm":
+                                _uname = v.get("uname", uid_str)
+                                break
+                        prompt = f"💬 私信回复 {_uname}（UID {uid_str}）"
+                        force_mid = tg.send_force_reply(prompt)
+                        if force_mid:
+                            bilibili_comments.register_dm_target(force_mid, int(uid_str), _uname)
+                    else:
+                        tg.send("用法：/dm <B站UID>")
+
                 elif text.startswith("/addspam "):
                     kw = text[9:].strip()
                     if kw:
