@@ -178,7 +178,9 @@ def main():
                 # 群组话题回复处理
                 if chat.get("id") == tg.GROUP_CHAT_ID:
                     text_g = msg.get("text", "").strip()
-                    reply_to = msg.get("reply_to_message", {})
+                    _raw_reply = msg.get("reply_to_message", {})
+                    # 话题内所有消息隐式带 reply_to 指向话题创建消息（mid == thread_id），不算真实引用
+                    reply_to = _raw_reply if _raw_reply.get("message_id") != msg.get("message_thread_id") else {}
                     if reply_to:
                         reply_mid = reply_to.get("message_id")
                         target = bilibili_comments.lookup_reply_target(reply_mid)
