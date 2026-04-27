@@ -40,15 +40,22 @@ def _queue_dispatcher():
 # ── 每小时扫描未处理通知 ──────────────────────────────────────────────────────
 
 def _pending_scanner():
-    """每小时检查最近 1 小时内未处理的通知，有则发引用提醒。"""
+    """每小时检查最近 1 小时内未处理的通知，有则按类型分发到对应 topic。"""
     while True:
         time.sleep(3600)
         pending = nt.get_pending(hours=1)
         if not pending:
             continue
-        tg.send(f"⏰ 有 {len(pending)} 条消息还未处理：")
         for item in pending:
-            tg.send("👆 点击引用跳转", reply_to_message_id=item["mid"])
+            label = item.get("label", "")
+            if label.startswith("💬") or label.startswith("❓"):
+                topic = tg.TOPIC_COMMENT
+            elif label.startswith("✉️"):
+                topic = tg.TOPIC_DM
+            else:
+                topic = tg.TOPIC_SYSTEM
+            tg.send_topic(topic, "⏰ 未处理，点击跳转",
+                          reply_to_message_id=item["mid"])
 
 
 # ── 获取 Telegram updates ─────────────────────────────────────────────────────
@@ -230,7 +237,7 @@ def main():
                                         try:
                                             sess = get_bilibili_session()
                                             ok = send_dm(sess, get_csrf(sess), int(u), t)
-                                            tg.send(f"✅ 私信已发给 {n}" if ok else "❌ 发送失败")
+                                            tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败")
                                         except Exception as e:
                                             tg.send(f"❌ 发送失败: {e}")
                                     threading.Thread(target=_do_dm_g, daemon=True).start()
@@ -367,7 +374,7 @@ def main():
                                     try:
                                         sess = get_bilibili_session()
                                         ok = send_dm(sess, get_csrf(sess), int(u), t)
-                                        tg.send(f"✅ 私信已发给 {n}" if ok else "❌ 发送失败")
+                                        tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败")
                                     except Exception as e:
                                         tg.send(f"❌ 发送失败: {e}")
                                 threading.Thread(target=_do_dm, daemon=True).start()

@@ -713,14 +713,22 @@ def _process_items(items, offline_prefix=""):
             elif item.get("type") == "dm":
                 dm_uid   = item.get("uid")
                 dm_uname = item.get("uname", str(dm_uid))
+                # 官方系统账号 → 系统通知 topic
+                _SYSTEM_UNAMES = {"UP主小助手", "哔哩哔哩", "哔哩哔哩直播小助手", "哔哩哔哩创作中心"}
+                is_system = dm_uname in _SYSTEM_UNAMES or "小助手" in dm_uname or "哔哩哔哩" in dm_uname
+                if is_system:
+                    tg.send_topic_md(tg.TOPIC_SYSTEM, prefix_md + msg, no_preview=True)
+                    continue
+
                 ig_names = _extract_ig_from_history(item.get("history", []))
                 ig_detected = ig_names[0] if ig_names else None
+                dm_link = f"https://message.bilibili.com/#/whisper/mid{dm_uid}"
                 btn_row = [("💬 回复", f"reply_dm:{dm_uid}")]
                 if ig_detected:
                     btn_row.insert(0, ("📤 发送合集", f"share:{dm_uid}:{ig_detected}"))
                 markup = tg.inline_keyboard([btn_row])
-                mid = tg.send_topic_md(tg.TOPIC_DM, prefix_md + msg,
-                                       no_preview=True, reply_markup=markup)
+                dm_msg = prefix_md + msg + f"\n🔗 {tg.link('查看私信对话', dm_link)}"
+                mid = tg.send_topic_md(tg.TOPIC_DM, dm_msg, no_preview=True, reply_markup=markup)
                 if mid and dm_uid:
                     register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)
                     from bot import notification_tracker as nt
