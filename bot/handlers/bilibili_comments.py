@@ -696,7 +696,6 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
             plain_md += f"\n\n⚠️ {tg.esc(uncertain_reason)}，判断不了"
             markup = tg.inline_keyboard([[
                 ("🗑️ 删除+拉黑", f"del_ban:{oid2}:{rpid2}:{uid2}"),
-                ("💬 回复", f"reply_c:{oid2}:{rpid2}"),
                 ("⏭️ 跳过", f"skip:{oid2}:{rpid2}"),
             ]])
             mid = tg.send_topic_md(tg.TOPIC_SPAM, plain_md, no_preview=True, reply_markup=markup)
@@ -717,8 +716,7 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
             if is_comment and not offline_prefix:
                 oid2  = item.get("oid")
                 rpid2 = item.get("rpid")
-                markup = tg.inline_keyboard([[("💬 回复", f"reply_c:{oid2}:{rpid2}")]])
-                mid = tg.send_topic_md(tg.TOPIC_COMMENT, prefix_md + msg, no_preview=True, reply_markup=markup)
+                mid = tg.send_topic_md(tg.TOPIC_COMMENT, prefix_md + msg, no_preview=True)
                 if mid and oid2 and rpid2:
                     register_reply_target(mid, oid2, rpid2, item.get("uname", ""))
                     from bot import notification_tracker as nt
@@ -739,12 +737,12 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
 
                 ig_names = _extract_ig_from_history(item.get("history", []))
                 dm_link = f"https://message.bilibili.com/#/whisper/mid{dm_uid}"
-                btn_row = [("💬 回复", f"reply_dm:{dm_uid}")]
+                btn_row = []
                 if len(ig_names) == 1:
-                    btn_row.insert(0, ("📤 发送合集", f"share:{dm_uid}:{ig_names[0]}"))
+                    btn_row.append(("📤 发送合集", f"share:{dm_uid}:{ig_names[0]}"))
                 elif len(ig_names) > 1:
-                    btn_row.insert(0, ("📤 发送全部合集", f"share_all:{dm_uid}"))
-                markup = tg.inline_keyboard([btn_row])
+                    btn_row.append(("📤 发送全部合集", f"share_all:{dm_uid}"))
+                markup = tg.inline_keyboard([btn_row]) if btn_row else None
                 dm_msg = prefix_md + msg + f"\n🔗 {tg.link('查看私信对话', dm_link)}"
                 mid = tg.send_topic_md(tg.TOPIC_DM, dm_msg, no_preview=True, reply_markup=markup)
                 if mid and dm_uid:
