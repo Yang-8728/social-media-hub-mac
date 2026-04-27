@@ -36,8 +36,9 @@ SPAM_KEYWORDS = [
     "后面加", "后面补", "结尾加", "结尾补",
 ]
 
-URL_RE    = re.compile(r'https?://\S+|b23\.tv/\S*|BV[a-zA-Z0-9]{10}', re.IGNORECASE)
-_B23_RE   = re.compile(r'b23\.tv/', re.IGNORECASE)
+URL_RE       = re.compile(r'https?://\S+|b23\.tv/\S*|BV[a-zA-Z0-9]{10}', re.IGNORECASE)
+_B23_RE      = re.compile(r'b23\.tv/', re.IGNORECASE)
+_BILI_LINK_RE = re.compile(r'bilibili\.com/', re.IGNORECASE)
 _IMG_RE = re.compile(r'\[[^\[\]]{3,}\]')
 
 # ── 文件路径 ──────────────────────────────────────────────────────────────────
@@ -107,11 +108,12 @@ def register_reply_target(msg_id: int, oid, rpid, uname: str,
     _save_reply_targets(_reply_targets)
 
 def register_dm_target(msg_id: int, uid, uname: str, ig_username: str = None,
-                       ig_usernames: list = None):
+                       ig_usernames: list = None, notify_mid: int = None):
     _reply_targets[int(msg_id)] = {
         "type": "dm", "uid": uid, "uname": uname,
         "ig": ig_username,
         "ig_list": ig_usernames or ([ig_username] if ig_username else []),
+        "notify_mid": notify_mid,
     }
     if len(_reply_targets) > MAX_REPLY_TARGETS:
         del _reply_targets[next(iter(_reply_targets))]
@@ -174,8 +176,8 @@ def _normalize(text: str) -> str:
     return _NORMALIZE_RE.sub("", text)
 
 def _is_spam(text: str) -> str | None:
-    if _B23_RE.search(text):
-        return "含b23.tv链接"
+    if _B23_RE.search(text) or _BILI_LINK_RE.search(text):
+        return "含B站链接"
     normalized = _normalize(text)
     for kw in SPAM_KEYWORDS + _load_custom_keywords():
         if kw in text or kw in normalized:
