@@ -67,7 +67,10 @@ def _get_updates(offset=None):
     return resp.json().get("result", [])
 
 
-# ── Topic 回复等待状态：{thread_id: target_dict}，重启后从文件恢复 ──────────────
+# ── ForceReply 去重：{orig_mid: fr_mid}，同一条通知只保留一个 ForceReply 消息 ──
+_force_reply_map: dict = {}  # orig_mid → fr_mid
+
+# ── Topic 回复等待状态（已废弃，仅保留文件兼容）──────────────────────────────────
 _PENDING_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temp", "pending_topic_reply.json")
 _pending_topic_reply: dict = {}
 _pending_lock = threading.Lock()
@@ -147,9 +150,12 @@ def _handle_callback(cq: dict):
         notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
         notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
         tg.answer_callback(cq_id)
-        # 发一条 ForceReply 消息触发输入框"Reply to"提示，注册为回复目标
+        # 同一条通知只保留一个 ForceReply 消息，重复点击先删旧的
+        if orig_mid in _force_reply_map:
+            tg.delete_message(tg.GROUP_CHAT_ID, _force_reply_map[orig_mid])
         fr_mid = tg.send_force_reply(f"回复 {uname}：", thread_id=orig_thread)
         if fr_mid:
+            _force_reply_map[orig_mid] = fr_mid
             bilibili_comments.register_reply_target(
                 fr_mid, int(oid), int(rpid), uname,
                 notify_mid=notify_mid, notify_text=notify_text)
@@ -163,9 +169,12 @@ def _handle_callback(cq: dict):
         ig_list = target.get("ig_list") if target else []
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_DM
         tg.answer_callback(cq_id)
-        # 发一条 ForceReply 消息触发输入框"Reply to"提示，注册为回复目标
+        # 同一条通知只保留一个 ForceReply 消息，重复点击先删旧的
+        if orig_mid in _force_reply_map:
+            tg.delete_message(tg.GROUP_CHAT_ID, _force_reply_map[orig_mid])
         fr_mid = tg.send_force_reply(f"回复 {uname}：", thread_id=orig_thread)
         if fr_mid:
+            _force_reply_map[orig_mid] = fr_mid
             bilibili_comments.register_dm_target(
                 fr_mid, int(uid), uname,
                 ig_usernames=ig_list, notify_mid=orig_mid)
@@ -269,50 +278,6 @@ def main():
                     _raw_reply = msg.get("reply_to_message", {})
                     # 话题内所有消息隐式带 reply_to 指向话题创建消息（mid == thread_id），不算真实引用
                     reply_to = _raw_reply if _raw_reply.get("message_id") != msg.get("message_thread_id") else {}
-
-                    # ── pending 状态：用户点了回复按钮，下一条普通消息直接作为回复内容 ──
-                    # /share 是 pending DM 的合法触发命令，需要放行
-                    if text_g and (not text_g.startswith("/") or text_g.startswith("/share")) and thread_id_g:
-                        pending = _pop_pending_reply(thread_id_g)
-                        print(f"[{time.strftime('%H:%M:%S')}] group msg: thread={thread_id_g} text={text_g[:20]!r} pending={bool(pending)}", flush=True)
-                        if pending:
-                            if pending["type"] == "comment":
-                                def _do_pending_comment(t=text_g, o=pending["oid"], r=pending["rpid"],
-                                                        u=pending["uname"], nm=pending.get("notify_mid"),
-                                                        nt_=pending.get("notify_text"), tid=thread_id_g):
-                                    from pipelines.quark_share import _reply_bilibili
-                                    try:
-                                        ok = _reply_bilibili(o, r, t)
-                                        tg.send_topic(tid, f"✅ 已回复 {u}" if ok else "❌ 回复失败")
-                                        if ok and nm:
-                                            clean = "\n".join(l for l in (nt_ or "").splitlines()
-                                                              if not l.startswith("⚠️")).strip()
-                                            tg.send_topic(tg.TOPIC_COMMENT, clean, no_preview=True)
-                                            tg.delete_message(tg.GROUP_CHAT_ID, nm)
-                                    except Exception as e:
-                                        tg.send_topic(tid, f"❌ 回复出错: {e}")
-                                threading.Thread(target=_do_pending_comment, daemon=True).start()
-                                continue
-                            elif pending["type"] == "dm":
-                                if text_g.startswith("/share"):
-                                    igs = (text_g.split()[1:1] or pending.get("ig_list") or [])
-                                    def _do_pending_share(u=pending["uid"], n=pending["uname"], igs_=igs):
-                                        for ig in igs_:
-                                            quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
-                                    threading.Thread(target=_do_pending_share, daemon=True).start()
-                                else:
-                                    def _do_pending_dm(t=text_g, u=pending["uid"], n=pending["uname"],
-                                                       nm=pending.get("notify_mid")):
-                                        from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
-                                        try:
-                                            sess = get_bilibili_session()
-                                            ok = send_dm(sess, get_csrf(sess), int(u), t)
-                                            tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败",
-                                                          reply_to_message_id=nm)
-                                        except Exception as e:
-                                            tg.send(f"❌ 发送失败: {e}")
-                                    threading.Thread(target=_do_pending_dm, daemon=True).start()
-                                continue
 
                     if reply_to:
                         reply_mid = reply_to.get("message_id")
