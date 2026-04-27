@@ -268,7 +268,7 @@ def fetch_new_dm(session, last_session_ts):
         ts = last_msg.get("timestamp", 0)
         unread = s.get("unread_count", 0)
 
-        if ts <= last_session_ts or unread == 0:
+        if ts <= last_session_ts:
             continue
 
         new_ts = max(new_ts, ts)
