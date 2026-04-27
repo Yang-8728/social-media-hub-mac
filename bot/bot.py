@@ -188,12 +188,22 @@ def main():
     if not os.environ.get("NO_MONITOR"):
         threading.Thread(target=bilibili_comments.run, daemon=True).start()
 
-    # Drain pending updates so we don't replay old commands on startup
+    # 启动时处理积压更新：callback 和近期消息正常处理，超过 2 分钟的旧命令跳过
+    pending_updates = []
     try:
         stale = _get_updates()
+        now = time.time()
+        skipped = 0
+        for u in stale:
+            ts = (u.get("callback_query", {}).get("message", {}).get("date")
+                  or u.get("message", {}).get("date", 0))
+            if now - ts > 120:  # 超过 2 分钟的旧更新跳过
+                skipped += 1
+            else:
+                pending_updates.append(u)
         if stale:
             offset = stale[-1]["update_id"] + 1
-            print(f"[{time.strftime('%H:%M:%S')}] Drained {len(stale)} stale update(s), offset={offset}", flush=True)
+            print(f"[{time.strftime('%H:%M:%S')}] Startup: {skipped} stale skipped, {len(pending_updates)} recent queued, offset={offset}", flush=True)
         else:
             offset = None
     except Exception:
@@ -201,7 +211,8 @@ def main():
 
     while True:
         try:
-            updates = _get_updates(offset)
+            updates = pending_updates + _get_updates(offset)
+            pending_updates = []
             for update in updates:
                 offset = update["update_id"] + 1
 
