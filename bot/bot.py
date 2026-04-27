@@ -104,12 +104,13 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
         orig_thread = orig_msg.get("message_thread_id")
-        tg.answer_callback(cq_id, "长按上方通知 → 回复，输入内容后发送")
-        if oid and rpid:
+        tg.answer_callback(cq_id)
+        force_mid = tg.send_force_reply("✏️", chat_id=tg.GROUP_CHAT_ID, thread_id=orig_thread)
+        if force_mid and oid and rpid:
             notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
             notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
             bilibili_comments.register_reply_target(
-                orig_mid, int(oid), int(rpid), uname,
+                force_mid, int(oid), int(rpid), uname,
                 notify_mid=notify_mid, notify_text=notify_text)
 
     elif data.startswith("reply_dm:"):
@@ -117,8 +118,11 @@ def _handle_callback(cq: dict):
         nt.resolve(orig_mid)
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
-        tg.answer_callback(cq_id, "长按上方通知 → 回复，输入内容后发送")
-        bilibili_comments.register_dm_target(orig_mid, int(uid), uname, notify_mid=orig_mid)
+        orig_thread = orig_msg.get("message_thread_id")
+        tg.answer_callback(cq_id)
+        force_mid = tg.send_force_reply("✏️", chat_id=tg.GROUP_CHAT_ID, thread_id=orig_thread)
+        if force_mid:
+            bilibili_comments.register_dm_target(force_mid, int(uid), uname, notify_mid=orig_mid)
 
     elif data.startswith("del_ban:"):
         parts = data.split(":")
