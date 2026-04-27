@@ -270,12 +270,22 @@ def fetch_new_dm(session, last_session_ts):
     results = []
     new_ts = last_session_ts
 
+    try:
+        my_uid = int(session.cookies.get("DedeUserID", domain=".bilibili.com") or 0)
+    except Exception:
+        my_uid = 0
+
     for s in sessions:
         last_msg = s.get("last_msg") or {}
         ts = last_msg.get("timestamp", 0)
         unread = s.get("unread_count", 0)
 
         if ts <= last_session_ts:
+            continue
+
+        # 最后一条消息是 bot 自己发的，说明已经自动回复过，不再推送
+        if my_uid and last_msg.get("sender_uid") == my_uid:
+            new_ts = max(new_ts, ts)
             continue
 
         new_ts = max(new_ts, ts)
