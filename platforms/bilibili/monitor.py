@@ -56,6 +56,13 @@ def save_state(state):
     with open(STATE_FILE, "w") as f:
         json.dump(state, f)
 
+def update_dm_ts(new_ts: int):
+    """DM 通知发送成功后才调用，避免 Telegram 失败导致通知丢失。"""
+    state = load_state()
+    if new_ts > state.get("last_dm_session", 0):
+        state["last_dm_session"] = new_ts
+        save_state(state)
+
 # ── B站 API 调用 ───────────────────────────────────────────────────────────────
 
 def api_get(session, url, params=None):
@@ -322,10 +329,10 @@ def poll():
 
     dms, new_dm_ts = fetch_new_dm(session, state["last_dm_session"])
     all_new.extend(dms)
-    state["last_dm_session"] = new_dm_ts
+    # DM 的 ts 不在这里保存，由调用方发送成功后调用 update_dm_ts() 保存
 
     save_state(state)
-    return all_new
+    return all_new, new_dm_ts
 
 
 if __name__ == "__main__":

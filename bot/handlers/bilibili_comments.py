@@ -589,15 +589,17 @@ def _cleanup_videos():
 def run():
     print(f"[bilibili_comments] 启动监控，轮询间隔 {INTERVAL}s", flush=True)
     backlog = []
+    backlog_dm_ts = 0
     while True:
-        items = bili_monitor.poll()
+        items, new_dm_ts = bili_monitor.poll()
         if not items:
             break
         backlog.extend(items)
+        backlog_dm_ts = max(backlog_dm_ts, new_dm_ts)
 
     if backlog:
         print(f"[bilibili_comments] 发现 {len(backlog)} 条积压通知，开始处理", flush=True)
-        _process_items(backlog, offline_prefix="[离线期间] ")
+        _process_items(backlog, offline_prefix="[离线期间] ", new_dm_ts=backlog_dm_ts)
 
     threading.Thread(target=_cleanup_videos, daemon=True).start()
     # 启动时立即做一次全量扫描
@@ -606,12 +608,12 @@ def run():
     last_scan = time.time()
     while True:
         try:
-            items = bili_monitor.poll()
+            items, new_dm_ts = bili_monitor.poll()
             if items:
                 if iq.is_interactive():
                     print(f"[bilibili_comments] 交互模式中，暂存 {len(items)} 条通知", flush=True)
                 else:
-                    _process_items(items)
+                    _process_items(items, new_dm_ts=new_dm_ts)
         except Exception as e:
             print(f"[bilibili_comments] 异常: {e}", flush=True)
 
@@ -622,7 +624,7 @@ def run():
         time.sleep(INTERVAL)
 
 
-def _process_items(items, offline_prefix=""):
+def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
     seen_rpids = set()
     for item in items:
         if item.get("type") not in ("reply", "at", "dm", "error"):
@@ -751,6 +753,8 @@ def _process_items(items, offline_prefix=""):
                                        ig_usernames=ig_names)
                     from bot import notification_tracker as nt
                     nt.record(mid, f"✉️私信 {dm_uname}")
+                    if new_dm_ts:
+                        bili_monitor.update_dm_ts(new_dm_ts)
 
             else:
                 tg.send_md(prefix_md + msg, no_preview=True)
