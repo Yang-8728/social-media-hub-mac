@@ -135,7 +135,7 @@ def _handle_callback(cq: dict):
         force_chat  = orig_chat if orig_chat == tg.GROUP_CHAT_ID else None
         force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=orig_thread)
         if force_mid:
-            bilibili_comments.register_dm_target(force_mid, int(uid), uname)
+            bilibili_comments.register_dm_target(force_mid, int(uid), uname, notify_mid=orig_mid)
 
     elif data.startswith("del_ban:"):
         parts = data.split(":")
@@ -244,12 +244,14 @@ def main():
                                         quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
                                     threading.Thread(target=_do_share_g, daemon=True).start()
                                 else:
-                                    def _do_dm_g(t=text_g, u=uid_g, n=uname_g):
+                                    notify_mid_dm_g = target.get("notify_mid")
+                                    def _do_dm_g(t=text_g, u=uid_g, n=uname_g, nm=notify_mid_dm_g):
                                         from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
                                         try:
                                             sess = get_bilibili_session()
                                             ok = send_dm(sess, get_csrf(sess), int(u), t)
-                                            tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败")
+                                            tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败",
+                                                          reply_to_message_id=nm)
                                         except Exception as e:
                                             tg.send(f"❌ 发送失败: {e}")
                                     threading.Thread(target=_do_dm_g, daemon=True).start()
@@ -356,6 +358,7 @@ def main():
                                 iq.resolve("0")
                         elif target["type"] == "dm":
                             uid, uname = target["uid"], target["uname"]
+                            notify_mid_dm_p = target.get("notify_mid")
                             if text.strip() == "/share":
                                 def _do_share(u=uid, n=uname):
                                     from platforms.bilibili.monitor import get_bilibili_session, _fetch_dm_history
@@ -381,12 +384,13 @@ def main():
                                     quark_share.run(ig, f"dm:{u}:{safe_uname}")
                                 threading.Thread(target=_do_share_ig, daemon=True).start()
                             else:
-                                def _do_dm(t=text, u=uid, n=uname):
+                                def _do_dm(t=text, u=uid, n=uname, nm=notify_mid_dm_p):
                                     from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
                                     try:
                                         sess = get_bilibili_session()
                                         ok = send_dm(sess, get_csrf(sess), int(u), t)
-                                        tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败")
+                                        tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败",
+                                                      reply_to_message_id=nm)
                                     except Exception as e:
                                         tg.send(f"❌ 发送失败: {e}")
                                 threading.Thread(target=_do_dm, daemon=True).start()
