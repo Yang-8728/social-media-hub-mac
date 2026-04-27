@@ -523,19 +523,17 @@ def _format_fan(item: dict) -> str | None:
         uid     = item.get("uid", "")
         unread  = item.get("unread", 1)
         history = item.get("history", [])
-        msg = f"✉️ *{uname}*（UID: {uid}）发来私信"
-        if unread > 1:
-            msg += f"（{unread}条未读）"
+        unread_suffix = f"（{unread}条未读）" if unread > 1 else ""
+        msg = f"\\[{tg.esc(uname)}\\] 私信{unread_suffix}"
         if history:
-            msg += "\n\n*历史消息：*"
+            msg += "\n"
             for h in history[-10:]:
-                who = "➡️ 我" if h["from_me"] else f"👤 {uname}"
-                msg += f"\n{who}：{tg.esc(h['text'])}"
-        # 检测历史消息里是否含章节格式（时间戳 + IG账号名）
+                who = "我" if h["from_me"] else "他"
+                msg += f"\n  {who}：{tg.esc(h['text'])}"
         ig_names = _extract_ig_from_history(history)
         if ig_names:
-            ig_list = "、".join(f"`{tg.esc(n)}`" for n in ig_names)
-            msg += f"\n\n🔍 检测到 IG 账号：{ig_list}"
+            ig_list = "、".join(tg.esc(n) for n in ig_names)
+            msg += f"\n\nIG：{ig_list}"
         return msg
 
     elif t == "error":
@@ -744,7 +742,7 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                 elif len(ig_names) > 1:
                     btn_row.insert(0, ("📤 发送全部合集", f"share_all:{dm_uid}"))
                 markup = tg.inline_keyboard([btn_row])
-                dm_msg = prefix_md + msg + f"\n🔗 {tg.link('查看私信对话', dm_link)}"
+                dm_msg = prefix_md + msg + f"\n\n{tg.link('查看私信', dm_link)}"
                 mid = tg.send_topic_md(tg.TOPIC_DM, dm_msg, no_preview=True, reply_markup=markup)
                 if mid and dm_uid:
                     register_dm_target(mid, dm_uid, dm_uname,
