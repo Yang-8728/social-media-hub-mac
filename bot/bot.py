@@ -104,23 +104,17 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
         orig_thread = orig_msg.get("message_thread_id")
-        orig_chat   = orig_msg.get("chat", {}).get("id")
         tg.answer_callback(cq_id)
 
-        # 截取评论内容作为引用预览
-        lines = [l for l in orig_text.splitlines() if l.startswith("📝")]
-        preview = lines[0][2:].strip()[:40] if lines else ""
-        prompt = f"💬 回复 *{tg.esc(uname)}*"
-        if preview:
-            prompt += f"：{tg.esc(preview)}"
-        force_chat = orig_chat if orig_chat == tg.GROUP_CHAT_ID else None
-        force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=orig_thread)
-        if force_mid and oid and rpid:
+        prompt = f"💬 回复 {uname}：请回复此消息输入内容"
+        prompt_mid = tg.send_topic(orig_thread or tg.TOPIC_COMMENT, prompt,
+                                   reply_to_message_id=orig_mid)
+        if prompt_mid and oid and rpid:
             # 若来自 TOPIC_SPAM，存入 notify_mid/text，回复成功后再转移
             notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
             notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
             bilibili_comments.register_reply_target(
-                force_mid, int(oid), int(rpid), uname,
+                prompt_mid, int(oid), int(rpid), uname,
                 notify_mid=notify_mid, notify_text=notify_text)
 
     elif data.startswith("reply_dm:"):
@@ -129,13 +123,12 @@ def _handle_callback(cq: dict):
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
         tg.answer_callback(cq_id)
-        prompt = f"💬 私信回复 *{tg.esc(uname)}*"
         orig_thread = orig_msg.get("message_thread_id")
-        orig_chat   = orig_msg.get("chat", {}).get("id")
-        force_chat  = orig_chat if orig_chat == tg.GROUP_CHAT_ID else None
-        force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=orig_thread)
-        if force_mid:
-            bilibili_comments.register_dm_target(force_mid, int(uid), uname, notify_mid=orig_mid)
+        prompt = f"💬 私信 {uname}：请回复此消息输入内容"
+        prompt_mid = tg.send_topic(orig_thread or tg.TOPIC_DM, prompt,
+                                   reply_to_message_id=orig_mid)
+        if prompt_mid:
+            bilibili_comments.register_dm_target(prompt_mid, int(uid), uname, notify_mid=orig_mid)
 
     elif data.startswith("del_ban:"):
         parts = data.split(":")
@@ -264,10 +257,10 @@ def main():
                                 if str(v.get("uid")) == uid_str_g and v.get("type") == "dm":
                                     _uname_g = v.get("uname", uid_str_g)
                                     break
-                            prompt_g = f"💬 私信回复 {_uname_g}（UID {uid_str_g}）"
-                            force_mid_g = tg.send_force_reply(prompt_g, chat_id=tg.GROUP_CHAT_ID, thread_id=thread_id_g)
-                            if force_mid_g:
-                                bilibili_comments.register_dm_target(force_mid_g, int(uid_str_g), _uname_g)
+                            prompt_g = f"💬 私信 {_uname_g}（UID {uid_str_g}）：请回复此消息输入内容"
+                            prompt_mid_g = tg.send_topic(thread_id_g, prompt_g)
+                            if prompt_mid_g:
+                                bilibili_comments.register_dm_target(prompt_mid_g, int(uid_str_g), _uname_g)
                         else:
                             tg.send_topic(msg.get("message_thread_id") or tg.TOPIC_SYSTEM, "用法：/dm <B站UID>")
                     elif text_g in ("/bilibili", "/download") and thread_id_g == tg.TOPIC_BILIBILI:
@@ -467,10 +460,10 @@ def main():
                             if str(v.get("uid")) == uid_str and v.get("type") == "dm":
                                 _uname = v.get("uname", uid_str)
                                 break
-                        prompt = f"💬 私信回复 {_uname}（UID {uid_str}）"
-                        force_mid = tg.send_force_reply(prompt)
-                        if force_mid:
-                            bilibili_comments.register_dm_target(force_mid, int(uid_str), _uname)
+                        prompt = f"💬 私信 {_uname}（UID {uid_str}）：请回复此消息输入内容"
+                        prompt_mid = tg.send_topic(tg.TOPIC_DM, prompt)
+                        if prompt_mid:
+                            bilibili_comments.register_dm_target(prompt_mid, int(uid_str), _uname)
                     else:
                         tg.send("用法：/dm <B站UID>")
 
