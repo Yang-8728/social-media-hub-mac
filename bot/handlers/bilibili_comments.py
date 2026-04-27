@@ -452,6 +452,9 @@ def _extract_ig_from_history(history: list) -> list:
             if h.get("from_me"):
                 continue
             for m in _IG_FUZZY_RE.finditer(h.get("text", "")):
+                g1, g2 = m.group(1), m.group(2)
+                if g1.isdigit() or g2.isdigit():
+                    continue
                 raw = m.group(0)
                 resolved = _resolve_ig_username(raw)
                 if resolved and resolved not in names:
