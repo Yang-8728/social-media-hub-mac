@@ -2,7 +2,7 @@
 Telegram Bot — 调度中心。
 只负责：收消息 → 路由命令 → 分发到 pipelines / 处理交互队列回复。
 """
-import sys, os, time, threading, requests
+import sys, os, time, threading, requests, json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -67,17 +67,40 @@ def _get_updates(offset=None):
     return resp.json().get("result", [])
 
 
-# ── Topic 回复等待状态：{thread_id: target_dict} ─────────────────────────────
+# ── Topic 回复等待状态：{thread_id: target_dict}，重启后从文件恢复 ──────────────
+_PENDING_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temp", "pending_topic_reply.json")
 _pending_topic_reply: dict = {}
 _pending_lock = threading.Lock()
+
+def _load_pending():
+    try:
+        if os.path.exists(_PENDING_FILE):
+            with open(_PENDING_FILE) as f:
+                data = json.load(f)
+            return {int(k): v for k, v in data.items()}
+    except Exception:
+        pass
+    return {}
+
+def _save_pending():
+    try:
+        os.makedirs(os.path.dirname(_PENDING_FILE), exist_ok=True)
+        with open(_PENDING_FILE, "w") as f:
+            json.dump({str(k): v for k, v in _pending_topic_reply.items()}, f)
+    except Exception:
+        pass
 
 def _set_pending_reply(thread_id: int, target: dict):
     with _pending_lock:
         _pending_topic_reply[thread_id] = target
+        _save_pending()
 
 def _pop_pending_reply(thread_id: int) -> dict | None:
     with _pending_lock:
-        return _pending_topic_reply.pop(thread_id, None)
+        val = _pending_topic_reply.pop(thread_id, None)
+        if val is not None:
+            _save_pending()
+        return val
 
 def _get_pending_reply(thread_id: int) -> dict | None:
     with _pending_lock:
@@ -180,6 +203,11 @@ def _handle_callback(cq: dict):
 def main():
     print(f"[{time.strftime('%H:%M:%S')}] Bot starting...", flush=True)
 
+    # 恢复持久化的 pending 状态
+    _pending_topic_reply.update(_load_pending())
+    if _pending_topic_reply:
+        print(f"[{time.strftime('%H:%M:%S')}] Restored {len(_pending_topic_reply)} pending reply state(s)", flush=True)
+
     # 后台线程
     threading.Thread(target=_queue_dispatcher, daemon=True).start()
     threading.Thread(target=_pending_scanner, daemon=True).start()
@@ -193,9 +221,12 @@ def main():
         now = time.time()
         skipped = 0
         for u in stale:
-            ts = (u.get("callback_query", {}).get("message", {}).get("date")
-                  or u.get("message", {}).get("date", 0))
-            if now - ts > 120:  # 超过 2 分钟的旧更新跳过
+            if "callback_query" in u:
+                # 用户主动点击按钮，不论消息多旧都保留处理
+                pending_updates.append(u)
+                continue
+            ts = u.get("message", {}).get("date", 0)
+            if now - ts > 120:  # 超过 2 分钟的旧命令跳过
                 skipped += 1
             else:
                 pending_updates.append(u)
