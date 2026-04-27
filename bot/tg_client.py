@@ -93,6 +93,17 @@ def delete_message(chat_id, message_id: int) -> bool:
         return False
 
 
+def edit_reply_markup(message_id: int, reply_markup: dict | None) -> bool:
+    try:
+        payload = {"chat_id": GROUP_CHAT_ID, "message_id": message_id}
+        payload["reply_markup"] = reply_markup or {}
+        r = requests.post(f"{BASE_URL}/editMessageReplyMarkup", json=payload, timeout=10,
+                          proxies={"http": None, "https": None})
+        return r.json().get("ok", False)
+    except Exception:
+        return False
+
+
 def answer_callback(callback_query_id: str, text: str = "") -> None:
     try:
         requests.post(f"{BASE_URL}/answerCallbackQuery",

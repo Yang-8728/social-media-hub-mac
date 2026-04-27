@@ -145,12 +145,15 @@ def _handle_callback(cq: dict):
         orig_text = orig_msg.get("text", "")
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_COMMENT
         print(f"[{time.strftime('%H:%M:%S')}] reply_c: thread={orig_thread} uname={uname} oid={oid} rpid={rpid}", flush=True)
-        tg.answer_callback(cq_id, f"直接在此发消息即可回复 {uname}")
+        tg.answer_callback(cq_id, "✏️ 在此话题发消息即可回复")
+        # 把通知消息的按钮换成等待提示，给用户明确的视觉反馈
+        tg.edit_reply_markup(orig_mid, tg.inline_keyboard([[("✏️ 在此话题发消息即可回复", "noop")]]))
         notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
         notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
         _set_pending_reply(orig_thread, {
             "type": "comment", "oid": int(oid), "rpid": int(rpid),
             "uname": uname, "notify_mid": notify_mid, "notify_text": notify_text,
+            "btn_mid": orig_mid,
         })
 
     elif data.startswith("reply_dm:"):
@@ -160,10 +163,12 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else uid
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_DM
         print(f"[{time.strftime('%H:%M:%S')}] reply_dm: thread={orig_thread} uname={uname} uid={uid}", flush=True)
-        tg.answer_callback(cq_id, f"直接在此发消息即可私信 {uname}")
+        tg.answer_callback(cq_id, "✏️ 在此话题发消息即可私信")
+        tg.edit_reply_markup(orig_mid, tg.inline_keyboard([[("✏️ 在此话题发消息即可私信", "noop")]]))
         _set_pending_reply(orig_thread, {
             "type": "dm", "uid": int(uid), "uname": uname, "notify_mid": orig_mid,
             "ig_list": target.get("ig_list") if target else [],
+            "btn_mid": orig_mid,
         })
 
     elif data.startswith("del_ban:"):
@@ -273,11 +278,14 @@ def main():
                             if pending["type"] == "comment":
                                 def _do_pending_comment(t=text_g, o=pending["oid"], r=pending["rpid"],
                                                         u=pending["uname"], nm=pending.get("notify_mid"),
-                                                        nt_=pending.get("notify_text"), tid=thread_id_g):
+                                                        nt_=pending.get("notify_text"), tid=thread_id_g,
+                                                        bm=pending.get("btn_mid")):
                                     from pipelines.quark_share import _reply_bilibili
                                     try:
                                         ok = _reply_bilibili(o, r, t)
                                         tg.send_topic(tid, f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                        if bm:
+                                            tg.edit_reply_markup(bm, {})  # 清掉等待提示按钮
                                         if ok and nm:
                                             clean = "\n".join(l for l in (nt_ or "").splitlines()
                                                               if not l.startswith("⚠️")).strip()
@@ -290,19 +298,24 @@ def main():
                             elif pending["type"] == "dm":
                                 if text_g.startswith("/share"):
                                     igs = (text_g.split()[1:1] or pending.get("ig_list") or [])
-                                    def _do_pending_share(u=pending["uid"], n=pending["uname"], igs_=igs):
+                                    bm = pending.get("btn_mid")
+                                    def _do_pending_share(u=pending["uid"], n=pending["uname"], igs_=igs, bm_=bm):
                                         for ig in igs_:
                                             quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
+                                        if bm_:
+                                            tg.edit_reply_markup(bm_, {})
                                     threading.Thread(target=_do_pending_share, daemon=True).start()
                                 else:
                                     def _do_pending_dm(t=text_g, u=pending["uid"], n=pending["uname"],
-                                                       nm=pending.get("notify_mid")):
+                                                       nm=pending.get("notify_mid"), bm=pending.get("btn_mid")):
                                         from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
                                         try:
                                             sess = get_bilibili_session()
                                             ok = send_dm(sess, get_csrf(sess), int(u), t)
                                             tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败",
                                                           reply_to_message_id=nm)
+                                            if bm:
+                                                tg.edit_reply_markup(bm, {})
                                         except Exception as e:
                                             tg.send(f"❌ 发送失败: {e}")
                                     threading.Thread(target=_do_pending_dm, daemon=True).start()
