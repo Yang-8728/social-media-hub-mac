@@ -67,6 +67,23 @@ def _get_updates(offset=None):
     return resp.json().get("result", [])
 
 
+# ── Topic 回复等待状态：{thread_id: target_dict} ─────────────────────────────
+_pending_topic_reply: dict = {}
+_pending_lock = threading.Lock()
+
+def _set_pending_reply(thread_id: int, target: dict):
+    with _pending_lock:
+        _pending_topic_reply[thread_id] = target
+
+def _pop_pending_reply(thread_id: int) -> dict | None:
+    with _pending_lock:
+        return _pending_topic_reply.pop(thread_id, None)
+
+def _get_pending_reply(thread_id: int) -> dict | None:
+    with _pending_lock:
+        return _pending_topic_reply.get(thread_id)
+
+
 # ── Inline Button 回调处理 ────────────────────────────────────────────────────
 
 def _handle_callback(cq: dict):
@@ -103,26 +120,26 @@ def _handle_callback(cq: dict):
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
-        orig_thread = orig_msg.get("message_thread_id")
-        tg.answer_callback(cq_id)
-        force_mid = tg.send_force_reply("✏️", chat_id=tg.GROUP_CHAT_ID, thread_id=orig_thread)
-        if force_mid and oid and rpid:
-            notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
-            notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
-            bilibili_comments.register_reply_target(
-                force_mid, int(oid), int(rpid), uname,
-                notify_mid=notify_mid, notify_text=notify_text)
+        orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_COMMENT
+        tg.answer_callback(cq_id, f"已就绪，直接在此发送对 {uname} 的回复内容")
+        notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
+        notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
+        _set_pending_reply(orig_thread, {
+            "type": "comment", "oid": int(oid), "rpid": int(rpid),
+            "uname": uname, "notify_mid": notify_mid, "notify_text": notify_text,
+        })
 
     elif data.startswith("reply_dm:"):
         _, uid = data.split(":", 1)
         nt.resolve(orig_mid)
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
-        orig_thread = orig_msg.get("message_thread_id")
-        tg.answer_callback(cq_id)
-        force_mid = tg.send_force_reply("✏️", chat_id=tg.GROUP_CHAT_ID, thread_id=orig_thread)
-        if force_mid:
-            bilibili_comments.register_dm_target(force_mid, int(uid), uname, notify_mid=orig_mid)
+        orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_DM
+        tg.answer_callback(cq_id, f"已就绪，直接在此发送对 {uname} 的私信内容")
+        _set_pending_reply(orig_thread, {
+            "type": "dm", "uid": int(uid), "uname": uname, "notify_mid": orig_mid,
+            "ig_list": target.get("ig_list") if target else [],
+        })
 
     elif data.startswith("del_ban:"):
         parts = data.split(":")
@@ -203,6 +220,46 @@ def main():
                     _raw_reply = msg.get("reply_to_message", {})
                     # 话题内所有消息隐式带 reply_to 指向话题创建消息（mid == thread_id），不算真实引用
                     reply_to = _raw_reply if _raw_reply.get("message_id") != msg.get("message_thread_id") else {}
+
+                    # ── pending 状态：用户点了回复按钮，下一条普通消息直接作为回复内容 ──
+                    if text_g and not text_g.startswith("/") and thread_id_g:
+                        pending = _pop_pending_reply(thread_id_g)
+                        if pending:
+                            if pending["type"] == "comment":
+                                def _do_pending_comment(t=text_g, o=pending["oid"], r=pending["rpid"],
+                                                        u=pending["uname"], nm=pending.get("notify_mid"),
+                                                        nt_=pending.get("notify_text")):
+                                    from pipelines.quark_share import _reply_bilibili
+                                    ok = _reply_bilibili(o, r, t)
+                                    tg.send_topic(thread_id_g, f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                    if ok and nm:
+                                        clean = "\n".join(l for l in (nt_ or "").splitlines()
+                                                          if not l.startswith("⚠️")).strip()
+                                        tg.send_topic(tg.TOPIC_COMMENT, clean, no_preview=True)
+                                        tg.delete_message(tg.GROUP_CHAT_ID, nm)
+                                threading.Thread(target=_do_pending_comment, daemon=True).start()
+                                continue
+                            elif pending["type"] == "dm":
+                                if text_g.startswith("/share"):
+                                    igs = (text_g.split()[1:1] or pending.get("ig_list") or [])
+                                    def _do_pending_share(u=pending["uid"], n=pending["uname"], igs_=igs):
+                                        for ig in igs_:
+                                            quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
+                                    threading.Thread(target=_do_pending_share, daemon=True).start()
+                                else:
+                                    def _do_pending_dm(t=text_g, u=pending["uid"], n=pending["uname"],
+                                                       nm=pending.get("notify_mid")):
+                                        from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
+                                        try:
+                                            sess = get_bilibili_session()
+                                            ok = send_dm(sess, get_csrf(sess), int(u), t)
+                                            tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败",
+                                                          reply_to_message_id=nm)
+                                        except Exception as e:
+                                            tg.send(f"❌ 发送失败: {e}")
+                                    threading.Thread(target=_do_pending_dm, daemon=True).start()
+                                continue
+
                     if reply_to:
                         reply_mid = reply_to.get("message_id")
                         target = bilibili_comments.lookup_reply_target(reply_mid)
