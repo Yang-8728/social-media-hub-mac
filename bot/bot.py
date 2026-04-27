@@ -85,6 +85,18 @@ def _handle_callback(cq: dict):
             quark_share.run(ig_, f"dm:{u}:{n.replace(' ','_')}")
         threading.Thread(target=_do, daemon=True).start()
 
+    elif data.startswith("share_all:"):
+        _, uid = data.split(":", 1)
+        tg.answer_callback(cq_id, "⏳ 正在处理全部合集...")
+        nt.resolve(orig_mid)
+        target = bilibili_comments.lookup_reply_target(orig_mid)
+        uname  = target["uname"] if target else uid
+        ig_list = target.get("ig_list", []) if target else []
+        def _do_all(u=uid, n=uname, igs=ig_list):
+            for ig_ in igs:
+                quark_share.run(ig_, f"dm:{u}:{n.replace(' ','_')}")
+        threading.Thread(target=_do_all, daemon=True).start()
+
     elif data.startswith("reply_c:"):
         _, oid, rpid = data.split(":")
         nt.resolve(orig_mid)

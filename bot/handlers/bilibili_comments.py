@@ -106,8 +106,13 @@ def register_reply_target(msg_id: int, oid, rpid, uname: str,
         del _reply_targets[next(iter(_reply_targets))]
     _save_reply_targets(_reply_targets)
 
-def register_dm_target(msg_id: int, uid, uname: str, ig_username: str = None):
-    _reply_targets[int(msg_id)] = {"type": "dm", "uid": uid, "uname": uname, "ig": ig_username}
+def register_dm_target(msg_id: int, uid, uname: str, ig_username: str = None,
+                       ig_usernames: list = None):
+    _reply_targets[int(msg_id)] = {
+        "type": "dm", "uid": uid, "uname": uname,
+        "ig": ig_username,
+        "ig_list": ig_usernames or ([ig_username] if ig_username else []),
+    }
     if len(_reply_targets) > MAX_REPLY_TARGETS:
         del _reply_targets[next(iter(_reply_targets))]
     _save_reply_targets(_reply_targets)
@@ -519,8 +524,8 @@ def _format_fan(item: dict) -> str | None:
         # 检测历史消息里是否含章节格式（时间戳 + IG账号名）
         ig_names = _extract_ig_from_history(history)
         if ig_names:
-            msg += f"\n\n🔍 检测到 IG 账号：`{tg.esc(ig_names[0])}`\n"
-            msg += f"👉 回复此消息发送 `/share`"
+            ig_list = "、".join(f"`{tg.esc(n)}`" for n in ig_names)
+            msg += f"\n\n🔍 检测到 IG 账号：{ig_list}"
         return msg
 
     elif t == "error":
@@ -721,16 +726,19 @@ def _process_items(items, offline_prefix=""):
                     continue
 
                 ig_names = _extract_ig_from_history(item.get("history", []))
-                ig_detected = ig_names[0] if ig_names else None
                 dm_link = f"https://message.bilibili.com/#/whisper/mid{dm_uid}"
                 btn_row = [("💬 回复", f"reply_dm:{dm_uid}")]
-                if ig_detected:
-                    btn_row.insert(0, ("📤 发送合集", f"share:{dm_uid}:{ig_detected}"))
+                if len(ig_names) == 1:
+                    btn_row.insert(0, ("📤 发送合集", f"share:{dm_uid}:{ig_names[0]}"))
+                elif len(ig_names) > 1:
+                    btn_row.insert(0, ("📤 发送全部合集", f"share_all:{dm_uid}"))
                 markup = tg.inline_keyboard([btn_row])
                 dm_msg = prefix_md + msg + f"\n🔗 {tg.link('查看私信对话', dm_link)}"
                 mid = tg.send_topic_md(tg.TOPIC_DM, dm_msg, no_preview=True, reply_markup=markup)
                 if mid and dm_uid:
-                    register_dm_target(mid, dm_uid, dm_uname, ig_username=ig_detected)
+                    register_dm_target(mid, dm_uid, dm_uname,
+                                       ig_username=ig_names[0] if ig_names else None,
+                                       ig_usernames=ig_names)
                     from bot import notification_tracker as nt
                     nt.record(mid, f"✉️私信 {dm_uname}")
 
