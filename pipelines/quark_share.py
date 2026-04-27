@@ -244,13 +244,16 @@ def _lookup_pending(rpid: str) -> dict:
 
 def _send_dm_reply(uid: str, ig_username: str, share_url: str):
     """通过 B站私信把夸克链接发给粉丝"""
-    from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
+    import time as _time
+    from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf, update_dm_ts
     try:
         sess = get_bilibili_session()
         csrf = get_csrf(sess)
         msg = _fan_msg(ig_username, share_url)
         ok = send_dm(sess, csrf, int(uid), msg)
         if ok:
+            # 更新 last_dm_session，避免 monitor 把刚发的消息当新DM再推送
+            update_dm_ts(int(_time.time()))
             _send(f"✅ 已通过私信发送链接给 UID {uid}")
         else:
             _send(f"⚠️ 私信发送失败（链接已生成）")

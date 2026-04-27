@@ -144,6 +144,7 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_COMMENT
+        print(f"[{time.strftime('%H:%M:%S')}] reply_c: thread={orig_thread} uname={uname} oid={oid} rpid={rpid}", flush=True)
         tg.answer_callback(cq_id, f"直接在此发消息即可回复 {uname}")
         notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
         notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
@@ -158,6 +159,7 @@ def _handle_callback(cq: dict):
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_DM
+        print(f"[{time.strftime('%H:%M:%S')}] reply_dm: thread={orig_thread} uname={uname} uid={uid}", flush=True)
         tg.answer_callback(cq_id, f"直接在此发消息即可私信 {uname}")
         _set_pending_reply(orig_thread, {
             "type": "dm", "uid": int(uid), "uname": uname, "notify_mid": orig_mid,
@@ -266,6 +268,7 @@ def main():
                     # ── pending 状态：用户点了回复按钮，下一条普通消息直接作为回复内容 ──
                     if text_g and not text_g.startswith("/") and thread_id_g:
                         pending = _pop_pending_reply(thread_id_g)
+                        print(f"[{time.strftime('%H:%M:%S')}] group msg: thread={thread_id_g} text={text_g[:20]!r} pending={bool(pending)}", flush=True)
                         if pending:
                             if pending["type"] == "comment":
                                 def _do_pending_comment(t=text_g, o=pending["oid"], r=pending["rpid"],
