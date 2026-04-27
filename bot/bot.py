@@ -88,29 +88,21 @@ def _handle_callback(cq: dict):
         orig_chat   = orig_msg.get("chat", {}).get("id")
         tg.answer_callback(cq_id)
 
-        # 若来自 TOPIC_SPAM（判断不了的评论），转移到 TOPIC_COMMENT
-        dest_thread = orig_thread
-        if orig_thread == tg.TOPIC_SPAM:
-            clean_lines = [l for l in orig_text.splitlines() if not l.startswith("⚠️")]
-            clean_text = "\n".join(clean_lines).strip()
-            markup_c = tg.inline_keyboard([[("💬 回复", f"reply_c:{oid}:{rpid}")]])
-            new_mid = tg.send_topic_md(tg.TOPIC_COMMENT, tg.esc(clean_text) if False else clean_text,
-                                       no_preview=True, reply_markup=markup_c)
-            if new_mid:
-                bilibili_comments.register_reply_target(new_mid, int(oid), int(rpid), uname)
-            tg.delete_message(orig_chat or tg.GROUP_CHAT_ID, orig_mid)
-            dest_thread = tg.TOPIC_COMMENT
-
         # 截取评论内容作为引用预览
         lines = [l for l in orig_text.splitlines() if l.startswith("📝")]
         preview = lines[0][2:].strip()[:40] if lines else ""
         prompt = f"💬 回复 *{tg.esc(uname)}*"
         if preview:
             prompt += f"：{tg.esc(preview)}"
-        force_chat  = orig_chat if orig_chat == tg.GROUP_CHAT_ID else None
-        force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=dest_thread)
+        force_chat = orig_chat if orig_chat == tg.GROUP_CHAT_ID else None
+        force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=orig_thread)
         if force_mid and oid and rpid:
-            bilibili_comments.register_reply_target(force_mid, int(oid), int(rpid), uname)
+            # 若来自 TOPIC_SPAM，存入 notify_mid/text，回复成功后再转移
+            notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
+            notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
+            bilibili_comments.register_reply_target(
+                force_mid, int(oid), int(rpid), uname,
+                notify_mid=notify_mid, notify_text=notify_text)
 
     elif data.startswith("reply_dm:"):
         _, uid = data.split(":", 1)
@@ -211,10 +203,18 @@ def main():
                             nt.resolve(reply_mid)
                             if target["type"] == "comment":
                                 oid, rpid, uname = target["oid"], target["rpid"], target["uname"]
-                                def _do_reply_g(t=text_g, o=oid, r=rpid, u=uname):
+                                notify_mid_g  = target.get("notify_mid")
+                                notify_text_g = target.get("notify_text")
+                                def _do_reply_g(t=text_g, o=oid, r=rpid, u=uname,
+                                                nm=notify_mid_g, nt_=notify_text_g):
                                     from pipelines.quark_share import _reply_bilibili
                                     ok = _reply_bilibili(o, r, t)
                                     tg.send(f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                    if ok and nm:
+                                        clean = "\n".join(l for l in (nt_ or "").splitlines()
+                                                          if not l.startswith("⚠️")).strip()
+                                        tg.send_topic(tg.TOPIC_COMMENT, clean, no_preview=True)
+                                        tg.delete_message(tg.GROUP_CHAT_ID, nm)
                                 threading.Thread(target=_do_reply_g, daemon=True).start()
                             elif target["type"] == "dm":
                                 uid_g, uname_g = target["uid"], target["uname"]
@@ -287,16 +287,24 @@ def main():
                             iq.resolve(text)
                         elif target["type"] == "comment":
                             oid, rpid, uname = target["oid"], target["rpid"], target["uname"]
+                            notify_mid_p  = target.get("notify_mid")
+                            notify_text_p = target.get("notify_text")
                             if text.startswith("/share "):
                                 ig_user = text.split()[1]
                                 def _do_share_comment(ig=ig_user, r=rpid):
                                     quark_share.run(ig, str(r))
                                 threading.Thread(target=_do_share_comment, daemon=True).start()
                             else:
-                                def _do_reply(t=text, o=oid, r=rpid, u=uname):
+                                def _do_reply(t=text, o=oid, r=rpid, u=uname,
+                                              nm=notify_mid_p, nt_=notify_text_p):
                                     from pipelines.quark_share import _reply_bilibili
                                     ok = _reply_bilibili(o, r, t)
                                     tg.send(f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                    if ok and nm:
+                                        clean = "\n".join(l for l in (nt_ or "").splitlines()
+                                                          if not l.startswith("⚠️")).strip()
+                                        tg.send_topic(tg.TOPIC_COMMENT, clean, no_preview=True)
+                                        tg.delete_message(tg.GROUP_CHAT_ID, nm)
                                 threading.Thread(target=_do_reply, daemon=True).start()
                             if iq.has_pending():
                                 iq.resolve("0")

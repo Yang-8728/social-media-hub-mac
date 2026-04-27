@@ -96,8 +96,12 @@ def _save_reply_targets(targets: dict):
 
 _reply_targets: dict = _load_reply_targets()
 
-def register_reply_target(msg_id: int, oid, rpid, uname: str):
-    _reply_targets[int(msg_id)] = {"type": "comment", "oid": oid, "rpid": rpid, "uname": uname}
+def register_reply_target(msg_id: int, oid, rpid, uname: str,
+                          notify_mid: int = None, notify_text: str = None):
+    _reply_targets[int(msg_id)] = {
+        "type": "comment", "oid": oid, "rpid": rpid, "uname": uname,
+        "notify_mid": notify_mid, "notify_text": notify_text,
+    }
     if len(_reply_targets) > MAX_REPLY_TARGETS:
         del _reply_targets[next(iter(_reply_targets))]
     _save_reply_targets(_reply_targets)
