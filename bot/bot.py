@@ -192,7 +192,8 @@ def main():
 
                 # 群组话题回复处理
                 if chat.get("id") == tg.GROUP_CHAT_ID:
-                    text_g = msg.get("text", "").strip()
+                    text_g    = msg.get("text", "").strip()
+                    thread_id_g = msg.get("message_thread_id")
                     _raw_reply = msg.get("reply_to_message", {})
                     # 话题内所有消息隐式带 reply_to 指向话题创建消息（mid == thread_id），不算真实引用
                     reply_to = _raw_reply if _raw_reply.get("message_id") != msg.get("message_thread_id") else {}
@@ -243,33 +244,33 @@ def main():
                                     _uname_g = v.get("uname", uid_str_g)
                                     break
                             prompt_g = f"💬 私信回复 {_uname_g}（UID {uid_str_g}）"
-                            thread_id_g = msg.get("message_thread_id")
                             force_mid_g = tg.send_force_reply(prompt_g, chat_id=tg.GROUP_CHAT_ID, thread_id=thread_id_g)
                             if force_mid_g:
                                 bilibili_comments.register_dm_target(force_mid_g, int(uid_str_g), _uname_g)
                         else:
                             tg.send_topic(msg.get("message_thread_id") or tg.TOPIC_SYSTEM, "用法：/dm <B站UID>")
-                    elif text_g == "/bilibili":
-                        threading.Thread(target=instagram_to_bili.run, daemon=True).start()
-                    elif text_g == "/download":
-                        threading.Thread(target=instagram_to_bili.run_download, daemon=True).start()
-                    elif text_g == "/clean_comments":
-                        threading.Thread(target=bilibili_comments.run_clean, daemon=True).start()
-                    elif text_g == "/auto_clean":
-                        threading.Thread(target=bilibili_comments.run_auto_clean, daemon=True).start()
-                    elif text_g.startswith("/share "):
+                    elif text_g in ("/bilibili", "/download") and thread_id_g == tg.TOPIC_BILIBILI:
+                        if text_g == "/bilibili":
+                            threading.Thread(target=instagram_to_bili.run, daemon=True).start()
+                        else:
+                            threading.Thread(target=instagram_to_bili.run_download, daemon=True).start()
+                    elif text_g in ("/clean_comments", "/auto_clean") and thread_id_g == tg.TOPIC_SPAM:
+                        if text_g == "/clean_comments":
+                            threading.Thread(target=bilibili_comments.run_clean, daemon=True).start()
+                        else:
+                            threading.Thread(target=bilibili_comments.run_auto_clean, daemon=True).start()
+                    elif text_g.startswith("/addspam ") and thread_id_g == tg.TOPIC_SPAM:
+                        kw_g = text_g[9:].strip()
+                        if kw_g:
+                            kws_g = add_keyword(kw_g)
+                            tg.send_topic(tg.TOPIC_SPAM, f"✅ 已添加关键词「{kw_g}」，当前自定义词库共 {len(kws_g)} 条")
+                    elif text_g.startswith("/share ") and thread_id_g == tg.TOPIC_DM:
                         parts_g = text_g.split()
                         ig_user_g = parts_g[1] if len(parts_g) > 1 else None
                         rpid_g = parts_g[2] if len(parts_g) > 2 else None
                         if ig_user_g:
                             threading.Thread(target=quark_share.run, args=(ig_user_g, rpid_g), daemon=True).start()
-                    elif text_g.startswith("/addspam "):
-                        kw_g = text_g[9:].strip()
-                        if kw_g:
-                            kws_g = add_keyword(kw_g)
-                            tg.send_topic(msg.get("message_thread_id") or tg.TOPIC_SYSTEM,
-                                          f"✅ 已添加关键词「{kw_g}」，当前自定义词库共 {len(kws_g)} 条")
-                    elif text_g.startswith("/wechat"):
+                    elif text_g.startswith("/wechat") and thread_id_g == tg.TOPIC_SYSTEM:
                         url_g = text_g[7:].strip()
                         if url_g:
                             threading.Thread(target=wechat_pipeline.run, args=(url_g,), daemon=True).start()
