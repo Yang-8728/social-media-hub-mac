@@ -493,30 +493,22 @@ def _format_fan(item: dict) -> str | None:
 
     if t == "reply":
         content = tg.esc(item.get("content", "")[:120])
-        title   = tg.esc(item.get("video_title", "")[:40])
         bvid    = item.get("bvid", "")
         rpid    = item.get("rpid", "")
         comment_url = f"https://www.bilibili.com/video/{bvid}?comment_root_id={rpid}" if bvid and rpid else ""
-        msg = f"💬 *{uname}* 评论了你的视频\n"
-        if title:
-            msg += f"🎬 《{title}》\n"
-        msg += f"📝 {content}"
+        msg = f"\\[{uname}\\] 评论\n他：{content}"
         if comment_url:
-            msg += f"\n🔗 {tg.link('查看评论', comment_url)}"
+            msg += f"\n{tg.link('查看评论', comment_url)}"
         return msg
 
     elif t == "at":
         content = tg.esc(item.get("content", "")[:120])
-        title   = tg.esc(item.get("video_title", "")[:40])
         bvid    = item.get("bvid", "")
         rpid    = item.get("rpid", "")
         comment_url = f"https://www.bilibili.com/video/{bvid}?comment_root_id={rpid}" if bvid and rpid else ""
-        msg = f"📣 *{uname}* @了你\n"
-        if title:
-            msg += f"🎬 《{title}》\n"
-        msg += f"📝 {content}"
+        msg = f"\\[{uname}\\] @了你\n他：{content}"
         if comment_url:
-            msg += f"\n🔗 {tg.link('查看评论', comment_url)}"
+            msg += f"\n{tg.link('查看评论', comment_url)}"
         return msg
 
     elif t == "dm":

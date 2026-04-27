@@ -42,6 +42,7 @@ def _send_raw(chat_id, text: str, markdown=False, no_preview=False,
         payload["parse_mode"] = "MarkdownV2"
     if no_preview:
         payload["link_preview_options"] = {"is_disabled": True}
+        payload["disable_web_page_preview"] = True
     if reply_markup:
         payload["reply_markup"] = reply_markup
     if reply_to_message_id:
