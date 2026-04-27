@@ -249,6 +249,32 @@ def main():
                                 bilibili_comments.register_dm_target(force_mid_g, int(uid_str_g), _uname_g)
                         else:
                             tg.send_topic(msg.get("message_thread_id") or tg.TOPIC_SYSTEM, "用法：/dm <B站UID>")
+                    elif text_g == "/bilibili":
+                        threading.Thread(target=instagram_to_bili.run, daemon=True).start()
+                    elif text_g == "/download":
+                        threading.Thread(target=instagram_to_bili.run_download, daemon=True).start()
+                    elif text_g == "/clean_comments":
+                        threading.Thread(target=bilibili_comments.run_clean, daemon=True).start()
+                    elif text_g == "/auto_clean":
+                        threading.Thread(target=bilibili_comments.run_auto_clean, daemon=True).start()
+                    elif text_g.startswith("/share "):
+                        parts_g = text_g.split()
+                        ig_user_g = parts_g[1] if len(parts_g) > 1 else None
+                        rpid_g = parts_g[2] if len(parts_g) > 2 else None
+                        if ig_user_g:
+                            threading.Thread(target=quark_share.run, args=(ig_user_g, rpid_g), daemon=True).start()
+                    elif text_g.startswith("/addspam "):
+                        kw_g = text_g[9:].strip()
+                        if kw_g:
+                            kws_g = add_keyword(kw_g)
+                            tg.send_topic(msg.get("message_thread_id") or tg.TOPIC_SYSTEM,
+                                          f"✅ 已添加关键词「{kw_g}」，当前自定义词库共 {len(kws_g)} 条")
+                    elif text_g.startswith("/wechat"):
+                        url_g = text_g[7:].strip()
+                        if url_g:
+                            threading.Thread(target=wechat_pipeline.run, args=(url_g,), daemon=True).start()
+                        else:
+                            threading.Thread(target=wechat_pipeline.run_liked, daemon=True).start()
                     continue
 
                 # 陌生人私信 → 转发给自己
