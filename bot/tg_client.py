@@ -102,7 +102,8 @@ def answer_callback(callback_query_id: str, text: str = "") -> None:
         pass
 
 
-def send_force_reply(text: str, markdown=False, chat_id=None, thread_id: int = None) -> int | None:
+def send_force_reply(text: str, markdown=False, chat_id=None, thread_id: int = None,
+                     reply_to_message_id: int = None) -> int | None:
     """发一条带 ForceReply 的消息，让用户进入引用回复模式。"""
     payload = {
         "chat_id": chat_id or GROUP_CHAT_ID,
@@ -113,6 +114,9 @@ def send_force_reply(text: str, markdown=False, chat_id=None, thread_id: int = N
         payload["parse_mode"] = "MarkdownV2"
     if thread_id:
         payload["message_thread_id"] = thread_id
+    if reply_to_message_id:
+        payload["reply_to_message_id"] = reply_to_message_id
+        payload["allow_sending_without_reply"] = True
     try:
         r = requests.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10,
                           proxies={"http": None, "https": None})

@@ -121,13 +121,15 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_COMMENT
-        tg.answer_callback(cq_id, f"已就绪，直接在此发送对 {uname} 的回复内容")
-        notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
-        notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
-        _set_pending_reply(orig_thread, {
-            "type": "comment", "oid": int(oid), "rpid": int(rpid),
-            "uname": uname, "notify_mid": notify_mid, "notify_text": notify_text,
-        })
+        tg.answer_callback(cq_id)
+        force_mid = tg.send_force_reply(f"回复 {uname}：", chat_id=tg.GROUP_CHAT_ID,
+                                        thread_id=orig_thread, reply_to_message_id=orig_mid)
+        if force_mid and oid and rpid:
+            notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
+            notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
+            bilibili_comments.register_reply_target(
+                force_mid, int(oid), int(rpid), uname,
+                notify_mid=notify_mid, notify_text=notify_text)
 
     elif data.startswith("reply_dm:"):
         _, uid = data.split(":", 1)
@@ -135,11 +137,11 @@ def _handle_callback(cq: dict):
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_DM
-        tg.answer_callback(cq_id, f"已就绪，直接在此发送对 {uname} 的私信内容")
-        _set_pending_reply(orig_thread, {
-            "type": "dm", "uid": int(uid), "uname": uname, "notify_mid": orig_mid,
-            "ig_list": target.get("ig_list") if target else [],
-        })
+        tg.answer_callback(cq_id)
+        force_mid = tg.send_force_reply(f"私信 {uname}：", chat_id=tg.GROUP_CHAT_ID,
+                                        thread_id=orig_thread, reply_to_message_id=orig_mid)
+        if force_mid:
+            bilibili_comments.register_dm_target(force_mid, int(uid), uname, notify_mid=orig_mid)
 
     elif data.startswith("del_ban:"):
         parts = data.split(":")
