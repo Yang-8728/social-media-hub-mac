@@ -144,27 +144,32 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_COMMENT
-        print(f"[{time.strftime('%H:%M:%S')}] reply_c: thread={orig_thread} uname={uname} oid={oid} rpid={rpid}", flush=True)
-        tg.answer_callback(cq_id, f"回复 {uname}：在此话题发消息即可")
         notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
         notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
-        _set_pending_reply(orig_thread, {
-            "type": "comment", "oid": int(oid), "rpid": int(rpid),
-            "uname": uname, "notify_mid": notify_mid, "notify_text": notify_text,
-        })
+        tg.answer_callback(cq_id)
+        # 发一条 ForceReply 消息触发输入框"Reply to"提示，注册为回复目标
+        fr_mid = tg.send_force_reply(f"回复 {uname}：", thread_id=orig_thread)
+        if fr_mid:
+            bilibili_comments.register_reply_target(
+                fr_mid, int(oid), int(rpid), uname,
+                notify_mid=notify_mid, notify_text=notify_text)
+        print(f"[{time.strftime('%H:%M:%S')}] reply_c: thread={orig_thread} uname={uname} fr_mid={fr_mid}", flush=True)
 
     elif data.startswith("reply_dm:"):
         _, uid = data.split(":", 1)
         nt.resolve(orig_mid)
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
+        ig_list = target.get("ig_list") if target else []
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_DM
-        print(f"[{time.strftime('%H:%M:%S')}] reply_dm: thread={orig_thread} uname={uname} uid={uid}", flush=True)
-        tg.answer_callback(cq_id, f"回复 {uname}：在此话题发消息即可")
-        _set_pending_reply(orig_thread, {
-            "type": "dm", "uid": int(uid), "uname": uname, "notify_mid": orig_mid,
-            "ig_list": target.get("ig_list") if target else [],
-        })
+        tg.answer_callback(cq_id)
+        # 发一条 ForceReply 消息触发输入框"Reply to"提示，注册为回复目标
+        fr_mid = tg.send_force_reply(f"回复 {uname}：", thread_id=orig_thread)
+        if fr_mid:
+            bilibili_comments.register_dm_target(
+                fr_mid, int(uid), uname,
+                ig_usernames=ig_list, notify_mid=orig_mid)
+        print(f"[{time.strftime('%H:%M:%S')}] reply_dm: thread={orig_thread} uname={uname} fr_mid={fr_mid}", flush=True)
 
     elif data.startswith("del_ban:"):
         parts = data.split(":")
