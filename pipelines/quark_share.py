@@ -75,7 +75,7 @@ def _download_ig_profile(ig_username: str, size_limit: int = SIZE_LIMIT) -> list
 
     loader = _get_ig_loader()
 
-    _send(f"📥 正在获取 @{ig_username} 的视频列表，下载中...")
+    print(f"[quark_share] 正在获取 @{ig_username} 的视频列表，下载中...", flush=True)
     profile = Profile.from_username(loader.context, ig_username)
 
     video_paths = []
@@ -150,7 +150,7 @@ def _upscale_bitrate(video_paths: list) -> list:
     if video_bps <= 0:
         return video_paths
 
-    _send(f"🔧 视频总大小 {total_bytes/1024/1024:.1f}MB < 200MB，正在升码率至约 210MB...")
+    print(f"[quark_share] 视频总大小 {total_bytes/1024/1024:.1f}MB < 200MB，正在升码率...", flush=True)
 
     new_paths = []
     for p in video_paths:
@@ -169,7 +169,7 @@ def _upscale_bitrate(video_paths: list) -> list:
         new_paths.append(p)
 
     new_total = sum(os.path.getsize(p) for p in new_paths)
-    _send(f"✅ 升码率完成：{new_total/1024/1024:.1f}MB")
+    print(f"[quark_share] 升码率完成：{new_total/1024/1024:.1f}MB", flush=True)
     return new_paths
 
 
@@ -179,12 +179,12 @@ def _zip_videos(video_paths: list, ig_username: str, uid: str = None) -> str:
     date_str = datetime.now().strftime("%Y%m%d")
     name = f"{uid}_{ig_username}_{date_str}" if uid else f"{ig_username}_{date_str}"
     zip_path = str(PROJECT_DIR / "temp" / f"{name}.zip")
-    _send(f"📦 正在打包 {len(video_paths)} 个视频...")
+    print(f"[quark_share] 正在打包 {len(video_paths)} 个视频...", flush=True)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
         for vp in video_paths:
             zf.write(vp, os.path.basename(vp))
     size_mb = os.path.getsize(zip_path) / 1024 / 1024
-    _send(f"📦 打包完成：{size_mb:.1f}MB")
+    print(f"[quark_share] 打包完成：{size_mb:.1f}MB", flush=True)
     for vp in video_paths:
         try:
             os.remove(vp)
@@ -305,7 +305,7 @@ def run(ig_username: str, target: str = None, thread_id: int = None):
 
     cached_url = _lookup_cached_url(ig_username)
     if cached_url:
-        _send(f"💾 @{ig_username} 7天内已上传过，复用现有链接...")
+        print(f"[quark_share] @{ig_username} 7天内已上传过，复用现有链接", flush=True)
         if target:
             if target.startswith("dm:"):
                 _send_dm_reply(uid_val, ig_username, cached_url)
@@ -317,7 +317,8 @@ def run(ig_username: str, target: str = None, thread_id: int = None):
                     reply_msg = _fan_msg(ig_username, cached_url)
                     ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
                     fan_label = context.get("uname", "粉丝")
-                    _send(f"✅ 已在 B站回复 {fan_label}" if ok else "⚠️ B站回复失败（链接已生成）")
+                    if not ok:
+                        _send(f"⚠️ B站回复失败（链接已生成）")
         recipient = fan_label or "（无指定接收人）"
         fan_text = _fan_msg(ig_username, cached_url)
         done_msg = (
@@ -330,7 +331,7 @@ def run(ig_username: str, target: str = None, thread_id: int = None):
         _send(done_msg, no_preview=True)
         return
 
-    _send(f"🚀 开始处理 @{ig_username} 的合集分享请求...")
+    print(f"[quark_share] 开始处理 @{ig_username} 的合集分享请求", flush=True)
 
     try:
         video_paths = _download_ig_profile(ig_username)
@@ -352,7 +353,7 @@ def run(ig_username: str, target: str = None, thread_id: int = None):
         return
 
     try:
-        _send(f"☁️ 正在上传到夸克网盘「{QuarkClient().upload_folder}」...")
+        print(f"[quark_share] 正在上传到夸克网盘...", flush=True)
         client = QuarkClient()
         folder_fid = client.get_or_create_folder(client.upload_folder)
         fid, fid_token = client.upload(zip_path, folder_fid)
@@ -381,9 +382,10 @@ def run(ig_username: str, target: str = None, thread_id: int = None):
                 ok = _reply_bilibili(int(oid), int(rpid), reply_msg)
                 fan_uname = context.get("uname", "粉丝")
                 fan_label = fan_uname
-                _send(f"✅ 已在 B站回复 {fan_uname}" if ok else "⚠️ B站回复失败（继续，链接已生成）")
+                if not ok:
+                    _send(f"⚠️ B站回复失败（链接已生成）")
             else:
-                _send(f"⚠️ 未找到 rpid={rpid} 的评论上下文，跳过回复")
+                print(f"[quark_share] 未找到 rpid={rpid} 的评论上下文，跳过回复", flush=True)
 
     import datetime
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
