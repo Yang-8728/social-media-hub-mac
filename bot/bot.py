@@ -231,11 +231,20 @@ def main():
                                 threading.Thread(target=_do_reply_g, daemon=True).start()
                             elif target["type"] == "dm":
                                 uid_g, uname_g = target["uid"], target["uname"]
-                                if text_g.startswith("/share "):
-                                    ig_user_g = text_g.split()[1]
-                                    def _do_share_g(u=uid_g, n=uname_g, ig=ig_user_g):
-                                        quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
-                                    threading.Thread(target=_do_share_g, daemon=True).start()
+                                if text_g.startswith("/share"):
+                                    parts_share = text_g.split()
+                                    if len(parts_share) > 1:
+                                        ig_list_g = [parts_share[1]]
+                                    else:
+                                        ig_list_g = target.get("ig_list") or (
+                                            [target["ig_username"]] if target.get("ig_username") else [])
+                                    if ig_list_g:
+                                        def _do_share_g(u=uid_g, n=uname_g, igs=ig_list_g):
+                                            for ig in igs:
+                                                quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
+                                        threading.Thread(target=_do_share_g, daemon=True).start()
+                                    else:
+                                        tg.send_topic(tg.TOPIC_DM, "⚠️ 未找到 IG 账号，请用 /share <ig账号> 指定")
                                 else:
                                     notify_mid_dm_g = target.get("notify_mid")
                                     def _do_dm_g(t=text_g, u=uid_g, n=uname_g, nm=notify_mid_dm_g):
@@ -352,30 +361,36 @@ def main():
                         elif target["type"] == "dm":
                             uid, uname = target["uid"], target["uname"]
                             notify_mid_dm_p = target.get("notify_mid")
-                            if text.strip() == "/share":
-                                def _do_share(u=uid, n=uname):
-                                    from platforms.bilibili.monitor import get_bilibili_session, _fetch_dm_history
-                                    from bot.handlers.bilibili_comments import _extract_ig_from_history
-                                    try:
-                                        tg.send(f"🔍 正在查找 {n} 的私信中的 IG 账号...")
-                                        sess = get_bilibili_session()
-                                        history = _fetch_dm_history(sess, int(u), size=20)
-                                        ig_names = _extract_ig_from_history(history)
-                                        if not ig_names:
-                                            tg.send("⚠️ 未在私信历史中找到IG账号")
-                                            return
+                            if text.startswith("/share"):
+                                parts_share_p = text.split()
+                                if len(parts_share_p) > 1:
+                                    ig_list_p = [parts_share_p[1]]
+                                else:
+                                    ig_list_p = target.get("ig_list") or (
+                                        [target["ig_username"]] if target.get("ig_username") else [])
+                                if ig_list_p:
+                                    def _do_share_p(u=uid, n=uname, igs=ig_list_p):
                                         safe_uname = n.replace(" ", "_")
-                                        t_arg = f"dm:{u}:{safe_uname}"
-                                        quark_share.run(ig_names[0], t_arg)
-                                    except Exception as e:
-                                        tg.send(f"❌ /share 出错: {e}")
-                                threading.Thread(target=_do_share, daemon=True).start()
-                            elif text.startswith("/share "):
-                                ig_user = text.split()[1]
-                                def _do_share_ig(u=uid, n=uname, ig=ig_user):
-                                    safe_uname = n.replace(" ", "_")
-                                    quark_share.run(ig, f"dm:{u}:{safe_uname}")
-                                threading.Thread(target=_do_share_ig, daemon=True).start()
+                                        for ig in igs:
+                                            quark_share.run(ig, f"dm:{u}:{safe_uname}")
+                                    threading.Thread(target=_do_share_p, daemon=True).start()
+                                else:
+                                    # 没有存储的 IG 账号，从 B站历史重新抓
+                                    def _do_share_fetch(u=uid, n=uname):
+                                        from platforms.bilibili.monitor import get_bilibili_session, _fetch_dm_history
+                                        from bot.handlers.bilibili_comments import _extract_ig_from_history
+                                        try:
+                                            sess = get_bilibili_session()
+                                            history = _fetch_dm_history(sess, int(u), size=20)
+                                            ig_names = _extract_ig_from_history(history)
+                                            if not ig_names:
+                                                tg.send("⚠️ 未在私信历史中找到IG账号")
+                                                return
+                                            for ig in ig_names:
+                                                quark_share.run(ig, f"dm:{u}:{n.replace(' ','_')}")
+                                        except Exception as e:
+                                            tg.send(f"❌ /share 出错: {e}")
+                                    threading.Thread(target=_do_share_fetch, daemon=True).start()
                             else:
                                 def _do_dm(t=text, u=uid, n=uname, nm=notify_mid_dm_p):
                                     from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
