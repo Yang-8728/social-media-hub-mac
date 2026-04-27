@@ -271,7 +271,8 @@ def main():
                     reply_to = _raw_reply if _raw_reply.get("message_id") != msg.get("message_thread_id") else {}
 
                     # ── pending 状态：用户点了回复按钮，下一条普通消息直接作为回复内容 ──
-                    if text_g and not text_g.startswith("/") and thread_id_g:
+                    # /share 是 pending DM 的合法触发命令，需要放行
+                    if text_g and (not text_g.startswith("/") or text_g.startswith("/share")) and thread_id_g:
                         pending = _pop_pending_reply(thread_id_g)
                         print(f"[{time.strftime('%H:%M:%S')}] group msg: thread={thread_id_g} text={text_g[:20]!r} pending={bool(pending)}", flush=True)
                         if pending:
