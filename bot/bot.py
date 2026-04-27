@@ -230,15 +230,18 @@ def main():
                             if pending["type"] == "comment":
                                 def _do_pending_comment(t=text_g, o=pending["oid"], r=pending["rpid"],
                                                         u=pending["uname"], nm=pending.get("notify_mid"),
-                                                        nt_=pending.get("notify_text")):
+                                                        nt_=pending.get("notify_text"), tid=thread_id_g):
                                     from pipelines.quark_share import _reply_bilibili
-                                    ok = _reply_bilibili(o, r, t)
-                                    tg.send_topic(thread_id_g, f"✅ 已回复 {u}" if ok else "❌ 回复失败")
-                                    if ok and nm:
-                                        clean = "\n".join(l for l in (nt_ or "").splitlines()
-                                                          if not l.startswith("⚠️")).strip()
-                                        tg.send_topic(tg.TOPIC_COMMENT, clean, no_preview=True)
-                                        tg.delete_message(tg.GROUP_CHAT_ID, nm)
+                                    try:
+                                        ok = _reply_bilibili(o, r, t)
+                                        tg.send_topic(tid, f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                        if ok and nm:
+                                            clean = "\n".join(l for l in (nt_ or "").splitlines()
+                                                              if not l.startswith("⚠️")).strip()
+                                            tg.send_topic(tg.TOPIC_COMMENT, clean, no_preview=True)
+                                            tg.delete_message(tg.GROUP_CHAT_ID, nm)
+                                    except Exception as e:
+                                        tg.send_topic(tid, f"❌ 回复出错: {e}")
                                 threading.Thread(target=_do_pending_comment, daemon=True).start()
                                 continue
                             elif pending["type"] == "dm":
@@ -272,10 +275,14 @@ def main():
                                 notify_mid_g  = target.get("notify_mid")
                                 notify_text_g = target.get("notify_text")
                                 def _do_reply_g(t=text_g, o=oid, r=rpid, u=uname,
-                                                nm=notify_mid_g, nt_=notify_text_g):
+                                                nm=notify_mid_g, nt_=notify_text_g, tid=thread_id_g):
                                     from pipelines.quark_share import _reply_bilibili
-                                    ok = _reply_bilibili(o, r, t)
-                                    tg.send(f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                    try:
+                                        ok = _reply_bilibili(o, r, t)
+                                    except Exception as e:
+                                        tg.send_topic(tid, f"❌ 回复出错: {e}")
+                                        return
+                                    tg.send_topic(tid, f"✅ 已回复 {u}" if ok else "❌ 回复失败")
                                     if ok and nm:
                                         clean = "\n".join(l for l in (nt_ or "").splitlines()
                                                           if not l.startswith("⚠️")).strip()
