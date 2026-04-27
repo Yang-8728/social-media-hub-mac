@@ -81,6 +81,16 @@ def send_topic_md(thread_id: int, text: str, no_preview=False,
                       reply_markup=reply_markup)
 
 
+def delete_message(chat_id, message_id: int) -> bool:
+    try:
+        r = requests.post(f"{BASE_URL}/deleteMessage",
+                          json={"chat_id": chat_id, "message_id": message_id}, timeout=10,
+                          proxies={"http": None, "https": None})
+        return r.json().get("ok", False)
+    except Exception:
+        return False
+
+
 def answer_callback(callback_query_id: str, text: str = "") -> None:
     try:
         requests.post(f"{BASE_URL}/answerCallbackQuery",

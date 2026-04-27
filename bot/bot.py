@@ -84,17 +84,31 @@ def _handle_callback(cq: dict):
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
+        orig_thread = orig_msg.get("message_thread_id")
+        orig_chat   = orig_msg.get("chat", {}).get("id")
+        tg.answer_callback(cq_id)
+
+        # 若来自 TOPIC_SPAM（判断不了的评论），转移到 TOPIC_COMMENT
+        dest_thread = orig_thread
+        if orig_thread == tg.TOPIC_SPAM:
+            clean_lines = [l for l in orig_text.splitlines() if not l.startswith("⚠️")]
+            clean_text = "\n".join(clean_lines).strip()
+            markup_c = tg.inline_keyboard([[("💬 回复", f"reply_c:{oid}:{rpid}")]])
+            new_mid = tg.send_topic_md(tg.TOPIC_COMMENT, tg.esc(clean_text) if False else clean_text,
+                                       no_preview=True, reply_markup=markup_c)
+            if new_mid:
+                bilibili_comments.register_reply_target(new_mid, int(oid), int(rpid), uname)
+            tg.delete_message(orig_chat or tg.GROUP_CHAT_ID, orig_mid)
+            dest_thread = tg.TOPIC_COMMENT
+
         # 截取评论内容作为引用预览
         lines = [l for l in orig_text.splitlines() if l.startswith("📝")]
         preview = lines[0][2:].strip()[:40] if lines else ""
-        tg.answer_callback(cq_id)
         prompt = f"💬 回复 *{tg.esc(uname)}*"
         if preview:
             prompt += f"：{tg.esc(preview)}"
-        orig_thread = orig_msg.get("message_thread_id")
-        orig_chat   = orig_msg.get("chat", {}).get("id")
         force_chat  = orig_chat if orig_chat == tg.GROUP_CHAT_ID else None
-        force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=orig_thread)
+        force_mid = tg.send_force_reply(prompt, markdown=True, chat_id=force_chat, thread_id=dest_thread)
         if force_mid and oid and rpid:
             bilibili_comments.register_reply_target(force_mid, int(oid), int(rpid), uname)
 
@@ -132,6 +146,15 @@ def _handle_callback(cq: dict):
     elif data.startswith("skip:"):
         tg.answer_callback(cq_id, "⏭️ 已跳过")
         nt.resolve(orig_mid)
+        # 若来自 TOPIC_SPAM，转移到 TOPIC_COMMENT（去掉警告行，无按钮）
+        orig_thread = orig_msg.get("message_thread_id")
+        if orig_thread == tg.TOPIC_SPAM:
+            orig_text = orig_msg.get("text", "")
+            orig_chat = orig_msg.get("chat", {}).get("id")
+            clean_lines = [l for l in orig_text.splitlines() if not l.startswith("⚠️")]
+            clean_text = "\n".join(clean_lines).strip()
+            tg.send_topic(tg.TOPIC_COMMENT, clean_text, no_preview=True)
+            tg.delete_message(orig_chat or tg.GROUP_CHAT_ID, orig_mid)
 
     else:
         tg.answer_callback(cq_id)
