@@ -6,10 +6,11 @@ BASE_URL  = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # 群组话题
 GROUP_CHAT_ID = -1003930642546
-TOPIC_SPAM    = 2   # 🗑️ 垃圾评论
-TOPIC_COMMENT = 3   # 💬 正常评论
-TOPIC_DM      = 4   # ✉️ 私信
-TOPIC_SYSTEM  = 5   # ⚙️ 系统通知
+TOPIC_SPAM    = 2    # 🗑️ 垃圾评论
+TOPIC_COMMENT = 3    # 💬 正常评论
+TOPIC_DM      = 4    # ✉️ 私信
+TOPIC_SYSTEM  = 5    # ⚙️ 系统通知
+TOPIC_BILIBILI = 134  # 📺 B站
 
 
 def esc(text: str) -> str:

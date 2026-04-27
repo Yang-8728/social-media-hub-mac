@@ -4,6 +4,12 @@ ai_vanvan 流程：全流程（下载→合并→上传）和仅下载。
 import os, re, subprocess
 from bot import tg_client as tg
 
+def _send(text, **kwargs):
+    tg.send_topic(tg.TOPIC_BILIBILI, text, **kwargs)
+
+def _send_md(text, **kwargs):
+    tg.send_topic_md(tg.TOPIC_BILIBILI, text, **kwargs)
+
 PROJECT_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VENV_PYTHON  = "/opt/homebrew/bin/python3"
 
@@ -23,7 +29,7 @@ def _get_video_duration(video_path: str) -> str:
 
 def run():
     """全流程（/bilibili）"""
-    tg.send_md("🚀 开始执行 ai\\_vanvan 全流程，请稍候\\.\\.\\.")
+    _send_md("🚀 开始执行 ai\\_vanvan 全流程，请稍候\\.\\.\\.")
 
     python = VENV_PYTHON if os.path.exists(VENV_PYTHON) else "python3"
     proc   = subprocess.Popen(
@@ -38,32 +44,32 @@ def run():
     def maybe_step(line):
         if "步骤1" in line or "下载最新内容" in line:
             if "dl" not in step_sent:
-                step_sent.add("dl"); tg.send_md("📥 第 1/3 步：正在下载最新内容\\.\\.\\.")
+                step_sent.add("dl"); _send_md("📥 第 1/3 步：正在下载最新内容\\.\\.\\.")
         elif "步骤2" in line or "合并视频" in line:
             if "mg" not in step_sent:
-                step_sent.add("mg"); tg.send_md("🔄 第 2/3 步：正在合并视频\\.\\.\\.")
+                step_sent.add("mg"); _send_md("🔄 第 2/3 步：正在合并视频\\.\\.\\.")
         elif "步骤3" in line or "上传最新视频" in line:
             if "up" not in step_sent:
-                step_sent.add("up"); tg.send_md("📤 第 3/3 步：正在上传到 B 站\\.\\.\\.")
+                step_sent.add("up"); _send_md("📤 第 3/3 步：正在上传到 B 站\\.\\.\\.")
         elif "等待审核" in line or "还在审核中" in line:
             if "rv" not in step_sent:
-                step_sent.add("rv"); tg.send_md("⏳ 视频审核中，每10秒检查一次\\.\\.\\.")
+                step_sent.add("rv"); _send_md("⏳ 视频审核中，每10秒检查一次\\.\\.\\.")
         elif "审核已通过" in line:
             if "rp" not in step_sent:
-                step_sent.add("rp"); tg.send_md("✅ 审核通过\\! 正在发章节评论并置顶\\.\\.\\.")
+                step_sent.add("rp"); _send_md("✅ 审核通过\\! 正在发章节评论并置顶\\.\\.\\.")
         elif "评论已置顶" in line:
             if "cm" not in step_sent:
-                step_sent.add("cm"); tg.send_md("📌 章节评论已发布并置顶\\!")
+                step_sent.add("cm"); _send_md("📌 章节评论已发布并置顶\\!")
         elif "COMMENT_BLOCKED" in line:
             if "cb" not in step_sent:
-                step_sent.add("cb"); tg.send("⚠️ 章节评论被B站拦截（内容违规），请手动发评论")
+                step_sent.add("cb"); _send("⚠️ 章节评论被B站拦截（内容违规），请手动发评论")
         elif "审核等待中" in line:
             m2 = re.search(r'已等约 (\d+) 分钟', line)
             if m2:
-                tg.send(f"⏳ 视频仍在审核中，已等待约 {m2.group(1)} 分钟…")
+                _send(f"⏳ 视频仍在审核中，已等待约 {m2.group(1)} 分钟…")
         elif "审核不通过" in line:
             if "nr" not in step_sent:
-                step_sent.add("nr"); tg.send("❌ 视频审核不通过！请手动检查稿件内容")
+                step_sent.add("nr"); _send("❌ 视频审核不通过！请手动检查稿件内容")
 
     try:
         for line in proc.stdout:
@@ -74,7 +80,7 @@ def run():
         proc.wait(timeout=3600)
     except subprocess.TimeoutExpired:
         proc.kill()
-        tg.send_md("⏰ 流程超时（超过 1 小时），已终止")
+        _send_md("⏰ 流程超时（超过 1 小时），已终止")
         return
 
     output = "\n".join(output_lines)
@@ -113,7 +119,7 @@ def run():
                       else ("✅ 已发布" if "评论已发送" in output
                       else ("❌ 被拦截（内容违规）" if "COMMENT_BLOCKED" in output else "—")))
 
-    tg.send_md(
+    _send_md(
         f"*ai\\_vanvan 流程完成*\n\n"
         f"📥 下载：`{tg.esc(downloaded)}` 个视频\n"
         f"🔄 合并：`{tg.esc(merged)}` 个视频\n"
@@ -126,7 +132,7 @@ def run():
 
 def run_download():
     """仅下载（/download）"""
-    tg.send_md("🔍 开始扫描并下载新视频（不合并、不上传）\\.\\.\\.")
+    _send_md("🔍 开始扫描并下载新视频（不合并、不上传）\\.\\.\\.")
 
     python = VENV_PYTHON if os.path.exists(VENV_PYTHON) else "python3"
     proc = subprocess.Popen(
@@ -144,7 +150,7 @@ def run_download():
         proc.wait(timeout=600)
     except subprocess.TimeoutExpired:
         proc.kill()
-        tg.send("⏰ 下载超时（超过10分钟），已终止")
+        _send("⏰ 下载超时（超过10分钟），已终止")
         return
 
     output = "\n".join(output_lines)
@@ -155,6 +161,6 @@ def run_download():
     downloaded = m.group(1) if m else "0"
 
     if "没有新的内容" in output or "0 个新视频" in output or downloaded == "0":
-        tg.send("✅ 扫描完成，没有新视频")
+        _send("✅ 扫描完成，没有新视频")
     else:
-        tg.send(f"✅ 扫描完成，下载了 {downloaded} 个新视频")
+        _send(f"✅ 扫描完成，下载了 {downloaded} 个新视频")
