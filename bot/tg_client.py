@@ -94,6 +94,17 @@ def delete_message(chat_id, message_id: int) -> bool:
         return False
 
 
+def set_reaction(chat_id, message_id: int, emoji: str) -> bool:
+    try:
+        r = requests.post(f"{BASE_URL}/setMessageReaction",
+                          json={"chat_id": chat_id, "message_id": message_id,
+                                "reaction": [{"type": "emoji", "emoji": emoji}]},
+                          timeout=10, proxies={"http": None, "https": None})
+        return r.json().get("ok", False)
+    except Exception:
+        return False
+
+
 def edit_reply_markup(message_id: int, reply_markup: dict | None) -> bool:
     try:
         payload = {"chat_id": GROUP_CHAT_ID, "message_id": message_id}

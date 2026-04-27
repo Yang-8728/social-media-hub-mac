@@ -290,7 +290,7 @@ def main():
                                 notify_text_g = target.get("notify_text")
                                 def _do_reply_g(t=text_g, o=oid, r=rpid, u=uname,
                                                 nm=notify_mid_g, nt_=notify_text_g, tid=thread_id_g,
-                                                fr=reply_mid):
+                                                fr=reply_mid, user_mid=msg.get("message_id")):
                                     from pipelines.quark_share import _reply_bilibili
                                     try:
                                         ok = _reply_bilibili(o, r, t)
@@ -298,7 +298,10 @@ def main():
                                         tg.send_topic(tid, f"❌ 回复出错: {e}")
                                         return
                                     tg.delete_message(tg.GROUP_CHAT_ID, fr)
-                                    tg.send_topic(tid, f"✅ 已回复 {u}" if ok else "❌ 回复失败")
+                                    if ok:
+                                        tg.set_reaction(tg.GROUP_CHAT_ID, user_mid, "✅")
+                                    else:
+                                        tg.send_topic(tid, "❌ 回复失败")
                                     if ok and nm:
                                         clean = "\n".join(l for l in (nt_ or "").splitlines()
                                                           if not l.startswith("⚠️")).strip()
@@ -324,14 +327,17 @@ def main():
                                 else:
                                     notify_mid_dm_g = target.get("notify_mid")
                                     def _do_dm_g(t=text_g, u=uid_g, n=uname_g, nm=notify_mid_dm_g,
-                                                 fr=reply_mid):
+                                                 fr=reply_mid, user_mid=msg.get("message_id")):
                                         from platforms.bilibili.monitor import send_dm, get_bilibili_session, get_csrf
                                         try:
                                             sess = get_bilibili_session()
                                             ok = send_dm(sess, get_csrf(sess), int(u), t)
                                             tg.delete_message(tg.GROUP_CHAT_ID, fr)
-                                            tg.send_topic(tg.TOPIC_DM, f"✅ 已回复 {n}" if ok else "❌ 私信发送失败",
-                                                          reply_to_message_id=nm)
+                                            if ok:
+                                                tg.set_reaction(tg.GROUP_CHAT_ID, user_mid, "✅")
+                                            else:
+                                                tg.send_topic(tg.TOPIC_DM, "❌ 私信发送失败",
+                                                              reply_to_message_id=nm)
                                         except Exception as e:
                                             tg.send(f"❌ 发送失败: {e}")
                                     threading.Thread(target=_do_dm_g, daemon=True).start()
