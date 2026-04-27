@@ -496,9 +496,9 @@ def _format_fan(item: dict) -> str | None:
         bvid    = item.get("bvid", "")
         rpid    = item.get("rpid", "")
         comment_url = f"https://www.bilibili.com/video/{bvid}?comment_root_id={rpid}" if bvid and rpid else ""
-        msg = f"\\[{uname}\\] 评论\n他：{content}"
+        msg = f"\\[{uname}\\] 评论\n\n  他：{content}"
         if comment_url:
-            msg += f"\n{tg.link('查看评论', comment_url)}"
+            msg += f"\n\n{tg.link('查看评论', comment_url)}"
         return msg
 
     elif t == "at":
@@ -506,9 +506,9 @@ def _format_fan(item: dict) -> str | None:
         bvid    = item.get("bvid", "")
         rpid    = item.get("rpid", "")
         comment_url = f"https://www.bilibili.com/video/{bvid}?comment_root_id={rpid}" if bvid and rpid else ""
-        msg = f"\\[{uname}\\] @了你\n他：{content}"
+        msg = f"\\[{uname}\\] @了你\n\n  他：{content}"
         if comment_url:
-            msg += f"\n{tg.link('查看评论', comment_url)}"
+            msg += f"\n\n{tg.link('查看评论', comment_url)}"
         return msg
 
     elif t == "dm":
