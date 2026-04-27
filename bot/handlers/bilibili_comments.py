@@ -675,14 +675,14 @@ def _process_items(items, offline_prefix=""):
                 ("💬 回复", f"reply_c:{oid2}:{rpid2}"),
                 ("⏭️ 跳过", f"skip:{oid2}:{rpid2}"),
             ]])
-            mid = tg.send_topic_md(tg.TOPIC_COMMENT, plain_md, no_preview=True, reply_markup=markup)
+            mid = tg.send_topic_md(tg.TOPIC_SPAM, plain_md, no_preview=True, reply_markup=markup)
             if mid and oid2 and rpid2:
                 register_reply_target(mid, oid2, rpid2, raw_uname)
                 from bot import notification_tracker as nt
                 nt.record(mid, f"❓评论 {raw_uname}")
             sub_msg = _scan_sub_replies(oid2, rpid2)
             if sub_msg:
-                tg.send_topic_md(tg.TOPIC_COMMENT, sub_msg)
+                tg.send_topic_md(tg.TOPIC_SPAM, sub_msg)
 
         else:
             msg = _format_fan(item)
