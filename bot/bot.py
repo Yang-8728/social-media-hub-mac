@@ -126,7 +126,7 @@ def _handle_callback(cq: dict):
             if ok and pending:
                 add_keyword(pending.get("content", ""))
             status = "✅ 已删除" + ("＋已拉黑" if bl else "")
-            tg.send(status if ok else "❌ 删除失败")
+            tg.send_topic(tg.TOPIC_SPAM, status if ok else "❌ 删除失败")
         threading.Thread(target=_do, daemon=True).start()
 
     elif data.startswith("skip:"):
