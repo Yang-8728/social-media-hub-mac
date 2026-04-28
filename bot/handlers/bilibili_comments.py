@@ -503,6 +503,12 @@ _IG_FUZZY_RE = re.compile(r'(?<![A-Za-z0-9])([A-Za-z0-9]{2,20})\s+([A-Za-z0-9]{2
 _IG_EMBED_RE = re.compile(r'(?<![A-Za-z0-9._])([A-Za-z0-9][A-Za-z0-9._]{2,28}[A-Za-z0-9_])(?![A-Za-z0-9._])')
 # B站表情括号：[打call]、[呲牙] 等，应在正则匹配前去掉，避免括号内英文被误识别
 _BILI_EMOJI_RE = re.compile(r'\[[一-鿿][^\[\]]*\]')
+# 用于在 IG 兜底匹配前剥离 URL，防止把 URL 片段误当账号名
+_URL_STRIP_RE = re.compile(r'https?://\S+', re.IGNORECASE)
+# 域名 TLD 后缀，命中则排除（pan.quark.cn 等）
+_DOMAIN_TLD_RE = re.compile(r'\.(cn|com|net|org|io|tv|cc|vip|xyz|top|club|lat|app|me|co)$', re.IGNORECASE)
+# 纯十六进制字符串（≥8位），排除哈希/ID 碎片
+_HEX_RE = re.compile(r'^[0-9a-f]{8,}$', re.IGNORECASE)
 
 def _resolve_ig_username(raw: str) -> str | None:
     """把可能带空格的名字尝试各种连接符，返回第一个存在的 IG 用户名，找不到返回 None。"""
@@ -564,9 +570,12 @@ def _extract_ig_from_history(history: list) -> list:
         for h in history:
             if h.get("from_me"):
                 continue
-            clean_text = _BILI_EMOJI_RE.sub("", h.get("text", ""))
+            # 先剥掉 URL，防止 URL 片段（https, pan.quark.cn, hash）被误识别
+            clean_text = _URL_STRIP_RE.sub("", _BILI_EMOJI_RE.sub("", h.get("text", "")))
             for m in _IG_EMBED_RE.finditer(clean_text):
                 name = m.group(1)
+                if _DOMAIN_TLD_RE.search(name) or _HEX_RE.match(name):
+                    continue
                 if name not in names:
                     names.append(name)
 
