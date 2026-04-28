@@ -117,10 +117,13 @@ def _retry_pending_shares():
             try:
                 ok = quark_share.run(ig, f"dm:{uid}:{uname.replace(' ','_')}",
                                      thread_id=tg.TOPIC_DM)
-                if ok:
-                    _pending_shares_done(uid, ig)
             except Exception as e:
                 print(f"[bilibili_comments] 补发失败 {ig}: {e}", flush=True)
+                ok = None
+            # 无论成功还是失败都从队列清除，避免每次重启重复报错
+            _pending_shares_done(uid, ig)
+            if not ok:
+                tg.send_topic(tg.TOPIC_DM, f"⚠️ 补发失败，请手动处理\n👤 {uname}\n📷 @{ig}")
 
 # ── 自定义关键词 ──────────────────────────────────────────────────────────────
 
