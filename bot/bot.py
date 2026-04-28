@@ -126,7 +126,7 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else uid
         def _do(u=uid, n=uname, ig_=ig, notif=orig_mid):
             quark_share.run(ig_, f"dm:{u}:{n.replace(' ','_')}")
-            tg.set_reaction(tg.GROUP_CHAT_ID, notif, "✅")
+            tg.set_reaction(tg.GROUP_CHAT_ID, notif, "👍")
         threading.Thread(target=_do, daemon=True).start()
 
     elif data.startswith("share_all:"):
@@ -139,7 +139,7 @@ def _handle_callback(cq: dict):
         def _do_all(u=uid, n=uname, igs=ig_list, notif=orig_mid):
             for ig_ in igs:
                 quark_share.run(ig_, f"dm:{u}:{n.replace(' ','_')}")
-            tg.set_reaction(tg.GROUP_CHAT_ID, notif, "✅")
+            tg.set_reaction(tg.GROUP_CHAT_ID, notif, "👍")
         threading.Thread(target=_do_all, daemon=True).start()
 
     elif data.startswith("reply_c:"):
@@ -302,7 +302,7 @@ def main():
                                         return
                                     tg.delete_message(tg.GROUP_CHAT_ID, fr)
                                     if ok:
-                                        tg.set_reaction(tg.GROUP_CHAT_ID, user_mid, "✅")
+                                        tg.set_reaction(tg.GROUP_CHAT_ID, user_mid, "👍")
                                     else:
                                         tg.send_topic(tid, "❌ 回复失败")
                                     if ok and nm:
@@ -337,7 +337,7 @@ def main():
                                             ok = send_dm(sess, get_csrf(sess), int(u), t)
                                             tg.delete_message(tg.GROUP_CHAT_ID, fr)
                                             if ok:
-                                                tg.set_reaction(tg.GROUP_CHAT_ID, user_mid, "✅")
+                                                tg.set_reaction(tg.GROUP_CHAT_ID, user_mid, "👍")
                                             else:
                                                 tg.send_topic(tg.TOPIC_DM, "❌ 私信发送失败",
                                                               reply_to_message_id=nm)
