@@ -282,6 +282,7 @@ def main():
                     if reply_to:
                         reply_mid = reply_to.get("message_id")
                         target = bilibili_comments.lookup_reply_target(reply_mid)
+                        print(f"[{time.strftime('%H:%M:%S')}] reply_to mid={reply_mid} target={'hit:'+target['type'] if target else 'miss'} text={text_g[:15]!r}", flush=True)
                         if target and text_g:
                             nt.resolve(reply_mid)
                             if target["type"] == "comment":

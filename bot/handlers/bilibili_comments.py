@@ -475,13 +475,6 @@ def _extract_ig_from_history(history: list) -> list:
                 if name not in names:
                     names.append(name)
 
-    # 过滤掉已经在 from_me 消息里出现过的 IG 账号（说明合集已发送）
-    def _normalize_ig(s):
-        return s.lower().replace("_", "").replace(".", "")
-    sent_texts = " ".join(h["text"] for h in history if h.get("from_me"))
-    sent_norm = _normalize_ig(sent_texts)
-    names = [n for n in names if _normalize_ig(n) not in sent_norm]
-
     return names
 
 
