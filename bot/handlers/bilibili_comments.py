@@ -834,6 +834,8 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                                     any_success = True
                             if any_success and notif:
                                 tg.edit_reply_markup(notif, tg.inline_keyboard([[("✅ 已分享", "noop")]]))
+                                from bot import notification_tracker as _nt
+                                _nt.resolve(notif)
                         threading.Thread(target=_auto_share, daemon=True).start()
 
             else:
