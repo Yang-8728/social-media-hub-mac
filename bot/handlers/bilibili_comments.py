@@ -403,7 +403,7 @@ def _blacklist_user(uid) -> bool:
 
 # ── IG 账号识别 ───────────────────────────────────────────────────────────────
 
-_CHAPTER_RE = re.compile(r'^\d{1,2}:\d{2}[ \t]+(\S+)', re.MULTILINE)
+_CHAPTER_RE = re.compile(r'^\d{1,2}:\d{2}[^\S\r\n]+(\S+)', re.MULTILINE)
 _IG_NAME_RE = re.compile(r'^([A-Za-z0-9._]{3,30})$', re.MULTILINE)
 # 匹配两个单词组成的名字，如 "mckinley bethel"
 _IG_FUZZY_RE = re.compile(r'(?<![A-Za-z0-9])([A-Za-z0-9]{2,20})\s+([A-Za-z0-9]{2,20})(?![A-Za-z0-9])')
