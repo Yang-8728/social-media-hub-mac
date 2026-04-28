@@ -380,7 +380,7 @@ def run(ig_username: str, target: str = None, thread_id: int = None):
             f"— 发给粉丝的消息 —\n{fan_text}"
         )
         _send(done_msg, no_preview=True)
-        return
+        return True
 
     print(f"[quark_share] 开始处理 @{ig_username} 的合集分享请求", flush=True)
 
@@ -465,3 +465,5 @@ def run(ig_username: str, target: str = None, thread_id: int = None):
         os.remove(zip_path)
     except Exception:
         pass
+
+    return True

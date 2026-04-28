@@ -753,10 +753,14 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                         import threading
                         def _auto_share(uid=dm_uid, uname=dm_uname, igs=ig_names, notif=mid):
                             from pipelines import quark_share
+                            any_success = False
                             for ig in igs:
-                                quark_share.run(ig, f"dm:{uid}:{uname.replace(' ','_')}",
-                                                thread_id=tg.TOPIC_DM)
-                            tg.edit_reply_markup(notif, tg.inline_keyboard([[("✅ 已分享", "noop")]]))
+                                ok = quark_share.run(ig, f"dm:{uid}:{uname.replace(' ','_')}",
+                                                     thread_id=tg.TOPIC_DM)
+                                if ok:
+                                    any_success = True
+                            if any_success:
+                                tg.edit_reply_markup(notif, tg.inline_keyboard([[("✅ 已分享", "noop")]]))
                         threading.Thread(target=_auto_share, daemon=True).start()
 
             else:
