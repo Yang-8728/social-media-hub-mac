@@ -514,7 +514,10 @@ def _format_fan(item: dict) -> str | None:
             msg += "\n"
             for h in history[-10:]:
                 who = "我" if h["from_me"] else "他"
-                msg += f"\n  {who}：{tg.esc(h['text'])}"
+                text = h['text']
+                if h["from_me"] and len(text) > 10:
+                    text = text[:10] + "…"
+                msg += f"\n  {who}：{tg.esc(text)}"
         ig_names = _extract_ig_from_history(history)
         if ig_names:
             ig_list = "、".join(tg.esc(n) for n in ig_names)
