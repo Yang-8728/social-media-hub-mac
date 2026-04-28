@@ -185,35 +185,45 @@ def _handle_callback(cq: dict):
                 ig_usernames=ig_list, notify_mid=orig_mid)
         print(f"[{time.strftime('%H:%M:%S')}] reply_dm: thread={orig_thread} uname={uname} fr_mid={fr_mid}", flush=True)
 
-    elif data.startswith("del_ban:"):
+    elif data.startswith("ban:") or data.startswith("del_ban:"):
         parts = data.split(":")
         oid, rpid, uid = parts[1], parts[2], parts[3]
-        tg.answer_callback(cq_id, "🗑️ 删除中...")
+        tg.answer_callback(cq_id, "🗑️ 处理中...")
         nt.resolve(orig_mid)
-        def _do(_oid=oid, _rpid=rpid, _uid=uid):
+        target = bilibili_comments.lookup_reply_target(orig_mid)
+        content = target.get("content", "") if target else ""
+        def _do_ban(_oid=oid, _rpid=rpid, _uid=uid, _content=content, notif=orig_mid):
             from bot.handlers.bilibili_comments import (
-                _delete_comment, _blacklist_user, add_keyword, _lookup_pending_by_rpid)
+                _delete_comment, _blacklist_user, add_keyword, extract_spam_keywords)
             ok = _delete_comment(int(_oid), int(_rpid))
             bl = _blacklist_user(int(_uid)) if ok and _uid else False
-            pending = _lookup_pending_by_rpid(_rpid)
-            if ok and pending:
-                add_keyword(pending.get("content", ""))
-            status = "✅ 已删除" + ("＋已拉黑" if bl else "")
-            tg.send_topic(tg.TOPIC_SPAM, status if ok else "❌ 删除失败")
-        threading.Thread(target=_do, daemon=True).start()
+            kws_added = []
+            if ok and _content:
+                for kw in extract_spam_keywords(_content):
+                    add_keyword(kw)
+                    kws_added.append(kw)
+            status = ("✅ 已删除" + ("＋拉黑" if bl else "")) if ok else "❌ 删除失败"
+            if kws_added:
+                status += f"\n📝 已加关键词：{'、'.join(kws_added)}"
+            tg.send_topic(tg.TOPIC_COMMENT, status)
+            if ok:
+                tg.edit_reply_markup(notif, None)
+        threading.Thread(target=_do_ban, daemon=True).start()
 
     elif data.startswith("skip:"):
         tg.answer_callback(cq_id, "⏭️ 已跳过")
         nt.resolve(orig_mid)
-        # 若来自 TOPIC_SPAM，转移到 TOPIC_COMMENT（去掉警告行，无按钮）
         orig_thread = orig_msg.get("message_thread_id")
         if orig_thread == tg.TOPIC_SPAM:
+            # 向后兼容：旧版 uncertain 消息在 TOPIC_SPAM，移到 TOPIC_COMMENT
             orig_text = orig_msg.get("text", "")
             orig_chat = orig_msg.get("chat", {}).get("id")
             clean_lines = [l for l in orig_text.splitlines() if not l.startswith("⚠️")]
             clean_text = "\n".join(clean_lines).strip()
             tg.send_topic(tg.TOPIC_COMMENT, clean_text, no_preview=True)
             tg.delete_message(orig_chat or tg.GROUP_CHAT_ID, orig_mid)
+        else:
+            tg.edit_reply_markup(orig_mid, None)
 
     else:
         tg.answer_callback(cq_id)

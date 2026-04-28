@@ -162,10 +162,12 @@ def _save_reply_targets(targets: dict):
 
 _reply_targets: dict = _load_reply_targets()
 
-def register_reply_target(msg_id: int, oid, rpid, uname: str,
-                          notify_mid: int = None, notify_text: str = None):
+def register_reply_target(msg_id: int, oid, rpid, uname: str, uid=None,
+                          notify_mid: int = None, notify_text: str = None,
+                          content: str = None):
     _reply_targets[int(msg_id)] = {
         "type": "comment", "oid": oid, "rpid": rpid, "uname": uname,
+        "uid": uid, "content": content,
         "notify_mid": notify_mid, "notify_text": notify_text,
     }
     if len(_reply_targets) > MAX_REPLY_TARGETS:
@@ -240,16 +242,39 @@ def _normalize(text: str) -> str:
     """去除常见插字符，防止「我动态!有」之类的标点拆词绕过。"""
     return _NORMALIZE_RE.sub("", text)
 
+_QQ_RE = re.compile(r'[🐧Qq][_\-]?\d{5,}')
+
 def _is_spam(text: str) -> str | None:
     if _B23_RE.search(text) or _BILI_LINK_RE.search(text):
         return "含B站链接"
     if _OBFUS_DOMAIN_RE.search(text):
         return "含混淆域名"
+    if _QQ_RE.search(text):
+        return "含QQ号引流"
     normalized = _normalize(text)
     for kw in SPAM_KEYWORDS + _load_custom_keywords():
         if kw in text or kw in normalized:
             return f"关键词: {kw}"
     return None
+
+
+def extract_spam_keywords(text: str) -> list[str]:
+    """从用户手动标记的垃圾评论里提取代表性关键词，用于自动拦截同类内容。"""
+    cleaned = _BILI_EMOJI_RE.sub('', text).strip()
+    keywords = []
+    # QQ/企鹅号引流
+    if _QQ_RE.search(text):
+        keywords.append('🐧_')
+    # "不许X" 变体（看完不许打/瑟/哈 等）
+    m = re.search(r'不许(.{1,3})', cleaned)
+    if m:
+        keywords.append('不许' + m.group(1))
+    # 没提取到特征时：取前12个非标点汉字或字母
+    if not keywords and cleaned:
+        pure = re.sub(r'[^一-鿿a-zA-Z0-9]', '', cleaned)
+        if len(pure) >= 3:
+            keywords.append(pure[:12])
+    return list(dict.fromkeys(k for k in keywords if k and len(k) >= 2))
 
 def _is_uncertain(text: str) -> str | None:
     if URL_RE.search(text):
@@ -737,36 +762,6 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
             if sub_msg:
                 tg.send_topic_md(tg.TOPIC_SPAM, sub_msg)
 
-        elif uncertain_reason and is_comment and not offline_prefix:
-            oid2        = item.get("oid")
-            rpid2       = item.get("rpid")
-            uid2        = item.get("uid")
-            raw_uname   = item.get("uname", "?")
-            raw_title   = item.get("video_title", "")[:40]
-            raw_content = item.get("content", "")[:120]
-            bvid2       = item.get("bvid", "")
-            comment_url2 = (f"https://www.bilibili.com/video/{bvid2}?comment_root_id={rpid2}"
-                            if bvid2 and rpid2 else "")
-            plain_md = f"❓ *{tg.esc(raw_uname)}* 评论了你的视频"
-            if raw_title:
-                plain_md += f"\n🎬 《{tg.esc(raw_title)}》"
-            plain_md += f"\n📝 {tg.esc(raw_content)}"
-            if comment_url2:
-                plain_md += f"\n🔗 {tg.link('查看评论', comment_url2)}"
-            plain_md += f"\n\n⚠️ {tg.esc(uncertain_reason)}，判断不了"
-            markup = tg.inline_keyboard([[
-                ("🗑️ 删除+拉黑", f"del_ban:{oid2}:{rpid2}:{uid2}"),
-                ("⏭️ 跳过", f"skip:{oid2}:{rpid2}"),
-            ]])
-            mid = tg.send_topic_md(tg.TOPIC_SPAM, plain_md, no_preview=True, reply_markup=markup)
-            if mid and oid2 and rpid2:
-                register_reply_target(mid, oid2, rpid2, raw_uname)
-                from bot import notification_tracker as nt
-                nt.record(mid, f"❓评论 {raw_uname}")
-            sub_msg = _scan_sub_replies(oid2, rpid2)
-            if sub_msg:
-                tg.send_topic_md(tg.TOPIC_SPAM, sub_msg)
-
         else:
             msg = _format_fan(item)
             if not msg:
@@ -774,12 +769,19 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
             prefix_md = f"_{tg.esc(offline_prefix.strip())}_\n" if offline_prefix else ""
 
             if is_comment:
-                oid2  = item.get("oid")
-                rpid2 = item.get("rpid")
-                markup = tg.inline_keyboard([[("💬 回复", f"reply_c:{oid2}:{rpid2}")]])
+                oid2     = item.get("oid")
+                rpid2    = item.get("rpid")
+                uid2     = item.get("uid") or item.get("mid", "")
+                content2 = item.get("content", "")
+                markup = tg.inline_keyboard([[
+                    ("🗑️ 拉黑删除", f"ban:{oid2}:{rpid2}:{uid2}"),
+                    ("💬 回复",     f"reply_c:{oid2}:{rpid2}"),
+                    ("⏭️ 跳过",    f"skip:{oid2}:{rpid2}"),
+                ]])
                 mid = tg.send_topic_md(tg.TOPIC_COMMENT, prefix_md + msg, no_preview=True, reply_markup=markup)
                 if mid and oid2 and rpid2:
-                    register_reply_target(mid, oid2, rpid2, item.get("uname", ""))
+                    register_reply_target(mid, oid2, rpid2, item.get("uname", ""),
+                                          uid=uid2, content=content2)
                     from bot import notification_tracker as nt
                     nt.record(mid, f"💬评论 {item.get('uname','')}")
                 sub_msg = _scan_sub_replies(oid2, rpid2)
