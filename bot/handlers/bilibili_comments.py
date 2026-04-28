@@ -254,6 +254,10 @@ def _is_spam(text: str) -> str | None:
         return "含混淆域名"
     if _QQ_RE.search(text):
         return "含QQ号引流"
+    # 纯B站表情评论：3个以上表情且去除后几乎无文字
+    emoji_matches = _BILI_EMOJI_RE.findall(text)
+    if len(emoji_matches) >= 3 and len(_BILI_EMOJI_RE.sub("", text).strip()) <= 2:
+        return "纯表情水评"
     normalized = _normalize(text)
     for kw in SPAM_KEYWORDS + _load_custom_keywords():
         if kw in text or kw in normalized:
