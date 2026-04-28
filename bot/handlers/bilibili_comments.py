@@ -54,7 +54,7 @@ DELETE_SKIP_FILE   = os.path.join(PROJECT_DIR, "temp", "delete_skip.json")
 ACCOUNT_NAME  = "ai_vanvan"
 MAX_VIDEOS    = 3
 INTERVAL      = 30
-SCAN_INTERVAL = 7200  # 全量扫描间隔（秒），2小时
+SCAN_INTERVAL = 600   # 全量扫描间隔（秒），10分钟
 SCAN_VIDEOS   = 5     # 每次扫最近几个视频
 MAX_REPLY_TARGETS = 200
 
