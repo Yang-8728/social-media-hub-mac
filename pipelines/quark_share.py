@@ -298,9 +298,7 @@ def _send_dm_reply(uid: str, ig_username: str, share_url: str):
         csrf = get_csrf(sess)
         msg = _fan_msg(ig_username, share_url)
         ok = send_dm(sess, csrf, int(uid), msg)
-        if ok:
-            _send(f"✅ 已通过私信发送链接给 UID {uid}")
-        else:
+        if not ok:
             _send(f"⚠️ 私信发送失败（链接已生成）")
     except Exception as e:
         _send(f"⚠️ 私信发送出错：{e}（链接已生成）")
