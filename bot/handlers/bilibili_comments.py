@@ -754,7 +754,7 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                     nt.record(mid, f"✉️私信 {dm_uname}")
                     if new_dm_ts:
                         bili_monitor.update_dm_ts(new_dm_ts)
-                    if ig_names and mid:
+                    if ig_names:
                         import threading
                         def _auto_share(uid=dm_uid, uname=dm_uname, igs=ig_names, notif=mid):
                             from pipelines import quark_share
@@ -764,7 +764,7 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                                                      thread_id=tg.TOPIC_DM)
                                 if ok:
                                     any_success = True
-                            if any_success:
+                            if any_success and notif:
                                 tg.edit_reply_markup(notif, tg.inline_keyboard([[("✅ 已分享", "noop")]]))
                         threading.Thread(target=_auto_share, daemon=True).start()
 
