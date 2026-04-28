@@ -124,8 +124,9 @@ def _handle_callback(cq: dict):
         nt.resolve(orig_mid)
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
-        def _do(u=uid, n=uname, ig_=ig):
+        def _do(u=uid, n=uname, ig_=ig, notif=orig_mid):
             quark_share.run(ig_, f"dm:{u}:{n.replace(' ','_')}")
+            tg.set_reaction(tg.GROUP_CHAT_ID, notif, "✅")
         threading.Thread(target=_do, daemon=True).start()
 
     elif data.startswith("share_all:"):
@@ -135,9 +136,10 @@ def _handle_callback(cq: dict):
         target = bilibili_comments.lookup_reply_target(orig_mid)
         uname  = target["uname"] if target else uid
         ig_list = target.get("ig_list", []) if target else []
-        def _do_all(u=uid, n=uname, igs=ig_list):
+        def _do_all(u=uid, n=uname, igs=ig_list, notif=orig_mid):
             for ig_ in igs:
                 quark_share.run(ig_, f"dm:{u}:{n.replace(' ','_')}")
+            tg.set_reaction(tg.GROUP_CHAT_ID, notif, "✅")
         threading.Thread(target=_do_all, daemon=True).start()
 
     elif data.startswith("reply_c:"):
