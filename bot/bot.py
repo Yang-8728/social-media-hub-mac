@@ -152,7 +152,7 @@ def _handle_callback(cq: dict):
         uname  = target["uname"] if target else "?"
         orig_text = orig_msg.get("text", "")
         orig_thread = orig_msg.get("message_thread_id") or tg.TOPIC_COMMENT
-        notify_mid  = orig_mid if orig_thread == tg.TOPIC_SPAM else None
+        notify_mid  = orig_mid
         notify_text = orig_text if orig_thread == tg.TOPIC_SPAM else None
         tg.answer_callback(cq_id)
         # 同一条通知只保留一个 ForceReply 消息，重复点击先删旧的
@@ -223,7 +223,7 @@ def _handle_callback(cq: dict):
             tg.send_topic(tg.TOPIC_COMMENT, clean_text, no_preview=True)
             tg.delete_message(orig_chat or tg.GROUP_CHAT_ID, orig_mid)
         else:
-            tg.edit_reply_markup(orig_mid, None)
+            tg.edit_reply_markup(orig_mid, tg.inline_keyboard([[("⏭️ 已跳过", "noop")]]))
 
     else:
         tg.answer_callback(cq_id)
@@ -319,10 +319,13 @@ def main():
                                     else:
                                         tg.send_topic(tid, "❌ 回复失败")
                                     if ok and nm:
-                                        clean = "\n".join(l for l in (nt_ or "").splitlines()
-                                                          if not l.startswith("⚠️")).strip()
-                                        tg.send_topic(tg.TOPIC_COMMENT, clean, no_preview=True)
-                                        tg.delete_message(tg.GROUP_CHAT_ID, nm)
+                                        if nt_:  # TOPIC_SPAM 向后兼容：重发到 TOPIC_COMMENT
+                                            clean = "\n".join(l for l in nt_.splitlines()
+                                                              if not l.startswith("⚠️")).strip()
+                                            tg.send_topic(tg.TOPIC_COMMENT, clean, no_preview=True)
+                                            tg.delete_message(tg.GROUP_CHAT_ID, nm)
+                                        else:
+                                            tg.edit_reply_markup(nm, tg.inline_keyboard([[("💬 已回复", "noop")]]))
                                 threading.Thread(target=_do_reply_g, daemon=True).start()
                             elif target["type"] == "dm":
                                 uid_g, uname_g = target["uid"], target["uname"]
