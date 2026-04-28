@@ -434,8 +434,8 @@ def _full_scan(label="定期"):
     summary = f"🔍 {label}扫描完成：删除 {deleted} 条垃圾评论" + (f"，失败 {failed} 条" if failed else "")
     print(f"[bilibili_comments] {summary}", flush=True)
     if deleted:
-        detail_lines = "\n".join(f"  👤{u}：{t}（{r}）" for u, t, r in deleted_details)
-        tg.send(f"{summary}\n{detail_lines}")
+        for u, t, r in deleted_details:
+            print(f"[bilibili_comments]   👤{u}：{t}（{r}）", flush=True)
 
 
 def _load_delete_skip() -> set:
@@ -750,19 +750,8 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
             bl    = _blacklist_user(uid) if ok and uid else False
             status = "已删除" + ("＋已拉黑" if bl else "") if ok else "删除失败"
             comment_url = f"https://www.bilibili.com/video/{bvid}?comment_root_id={rpid}" if bvid and rpid else ""
-            msg = (
-                f"🗑️ 自动删除垃圾评论\n"
-                f"👤 {tg.esc(uname)}\n"
-                f"🏷️ {tg.esc(spam_reason)}\n"
-                f"📝 {tg.esc(content[:80])}\n"
-                f"{'✅' if ok else '❌'} {status}"
-            )
-            if comment_url:
-                msg += f"\n🔗 {tg.link('查看评论', comment_url)}"
-            tg.send_topic_md(tg.TOPIC_SPAM, msg, no_preview=True)
-            sub_msg = _scan_sub_replies(oid, rpid)
-            if sub_msg:
-                tg.send_topic_md(tg.TOPIC_SPAM, sub_msg)
+            print(f"[bilibili_comments] 🗑️ 自动删除 👤{uname} 🏷️{spam_reason} 📝{content[:60]} {'✅' if ok else '❌'}{status}", flush=True)
+            _scan_sub_replies(oid, rpid)
 
         else:
             msg = _format_fan(item)
