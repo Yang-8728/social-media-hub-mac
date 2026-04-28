@@ -47,11 +47,12 @@ _IMG_RE = re.compile(r'\[[^\[\]]{3,}\]')
 # ── 文件路径 ──────────────────────────────────────────────────────────────────
 
 PROJECT_DIR        = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-COOKIE_FILE        = os.path.join(PROJECT_DIR, "temp", "bili_cookies_ai_vanvan.json")
-CUSTOM_KW_FILE     = os.path.join(PROJECT_DIR, "config", "spam_keywords_custom.json")
-REPLY_TARGETS_FILE = os.path.join(PROJECT_DIR, "temp", "reply_targets.json")
-PENDING_FILE       = os.path.join(PROJECT_DIR, "temp", "pending_comments.json")
-DELETE_SKIP_FILE   = os.path.join(PROJECT_DIR, "temp", "delete_skip.json")
+COOKIE_FILE          = os.path.join(PROJECT_DIR, "temp", "bili_cookies_ai_vanvan.json")
+CUSTOM_KW_FILE       = os.path.join(PROJECT_DIR, "config", "spam_keywords_custom.json")
+REPLY_TARGETS_FILE   = os.path.join(PROJECT_DIR, "temp", "reply_targets.json")
+PENDING_FILE         = os.path.join(PROJECT_DIR, "temp", "pending_comments.json")
+DELETE_SKIP_FILE     = os.path.join(PROJECT_DIR, "temp", "delete_skip.json")
+PENDING_SHARES_FILE  = os.path.join(PROJECT_DIR, "temp", "pending_dm_shares.json")
 
 ACCOUNT_NAME  = "ai_vanvan"
 MAX_VIDEOS    = 3
@@ -59,6 +60,67 @@ INTERVAL      = 30
 SCAN_INTERVAL = 600   # 全量扫描间隔（秒），10分钟
 SCAN_VIDEOS   = 5     # 每次扫最近几个视频
 MAX_REPLY_TARGETS = 200
+
+# ── 待发私信分享队列 ──────────────────────────────────────────────────────────
+
+def _pending_shares_load() -> dict:
+    try:
+        if os.path.exists(PENDING_SHARES_FILE):
+            return json.load(open(PENDING_SHARES_FILE))
+    except Exception:
+        pass
+    return {}
+
+def _pending_shares_save(data: dict):
+    try:
+        with open(PENDING_SHARES_FILE, "w") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"[bilibili_comments] pending_shares 写入失败: {e}", flush=True)
+
+def _pending_shares_add(uid, uname: str, igs: list):
+    """记录一个待发分享任务（去重）"""
+    data = _pending_shares_load()
+    key = str(uid)
+    existing_igs = set(data.get(key, {}).get("igs", []))
+    all_igs = list(existing_igs | set(igs))
+    data[key] = {"uid": uid, "uname": uname, "igs": all_igs, "ts": time.time()}
+    _pending_shares_save(data)
+
+def _pending_shares_done(uid, ig: str):
+    """标记某粉丝的某个 IG 分享已完成；全部完成则删除该条目"""
+    data = _pending_shares_load()
+    key = str(uid)
+    if key not in data:
+        return
+    remaining = [i for i in data[key].get("igs", []) if i != ig]
+    if remaining:
+        data[key]["igs"] = remaining
+    else:
+        del data[key]
+    _pending_shares_save(data)
+
+def _retry_pending_shares():
+    """bot 启动时调用，补发所有未完成的私信分享（超过5分钟的条目）"""
+    data = _pending_shares_load()
+    now = time.time()
+    stale = {k: v for k, v in data.items() if now - v.get("ts", 0) > 300}
+    if not stale:
+        return
+    print(f"[bilibili_comments] 发现 {len(stale)} 条未完成的分享任务，开始补发", flush=True)
+    tg.send(f"⚠️ 发现 {len(stale)} 条未完成分享，开始补发...")
+    from pipelines import quark_share
+    for uid, entry in stale.items():
+        uname = entry.get("uname", uid)
+        for ig in list(entry.get("igs", [])):
+            print(f"[bilibili_comments] 补发 uid={uid}({uname}) ig={ig}", flush=True)
+            try:
+                ok = quark_share.run(ig, f"dm:{uid}:{uname.replace(' ','_')}",
+                                     thread_id=tg.TOPIC_DM)
+                if ok:
+                    _pending_shares_done(uid, ig)
+            except Exception as e:
+                print(f"[bilibili_comments] 补发失败 {ig}: {e}", flush=True)
 
 # ── 自定义关键词 ──────────────────────────────────────────────────────────────
 
@@ -600,6 +662,8 @@ def run():
     threading.Thread(target=_cleanup_videos, daemon=True).start()
     # 启动时立即做一次全量扫描
     threading.Thread(target=_full_scan, args=("启动",), daemon=True).start()
+    # 补发上次未完成的私信分享
+    threading.Thread(target=_retry_pending_shares, daemon=True).start()
 
     last_scan = time.time()
     while True:
@@ -755,6 +819,7 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                     if new_dm_ts:
                         bili_monitor.update_dm_ts(new_dm_ts)
                     if ig_names:
+                        _pending_shares_add(dm_uid, dm_uname, ig_names)
                         import threading
                         def _auto_share(uid=dm_uid, uname=dm_uname, igs=ig_names, notif=mid):
                             from pipelines import quark_share
@@ -763,6 +828,7 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                                 ok = quark_share.run(ig, f"dm:{uid}:{uname.replace(' ','_')}",
                                                      thread_id=tg.TOPIC_DM)
                                 if ok:
+                                    _pending_shares_done(uid, ig)
                                     any_success = True
                             if any_success and notif:
                                 tg.edit_reply_markup(notif, tg.inline_keyboard([[("✅ 已分享", "noop")]]))
