@@ -27,8 +27,9 @@ SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
 
 
 def _get_known_igs() -> list[str]:
-    """从分享日志获取所有已知 IG 账号名（status=ok 的记录）"""
+    """从分享日志和章节记录获取所有已知 IG 账号名"""
     known: set[str] = set()
+    # 分享日志
     if SHARE_LOG.exists():
         with open(SHARE_LOG, encoding="utf-8") as f:
             for line in f:
@@ -38,6 +39,17 @@ def _get_known_igs() -> list[str]:
                         known.add(r["ig"])
                 except Exception:
                     pass
+    # 章节记录（涵盖所有上传过的视频）
+    _CHAPTER_PAT = re.compile(r'^\d{1,2}:\d{2}[^\S\r\n]+(\S+)', re.MULTILINE)
+    for merge_file in (PROJECT_DIR / "logs" / "merges").glob("*_merged_record.json"):
+        try:
+            with open(merge_file, encoding="utf-8") as f:
+                data = json.load(f)
+            for r in data.get("merged_videos", []):
+                for m in _CHAPTER_PAT.finditer(r.get("chapter_list", "")):
+                    known.add(m.group(1))
+        except Exception:
+            pass
     return sorted(known)
 
 
