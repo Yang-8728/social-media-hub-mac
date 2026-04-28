@@ -475,6 +475,8 @@ def _extract_ig_from_history(history: list) -> list:
                 if name not in names:
                     names.append(name)
 
+    # 过滤 B站 BV 号（BV + 10位字母数字），防止活动通知里的视频ID被误识别
+    names = [n for n in names if not re.match(r'^BV[A-Za-z0-9]{10}$', n, re.IGNORECASE)]
     return names
 
 
@@ -717,7 +719,11 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                 dm_uname = item.get("uname", str(dm_uid))
                 # 官方系统账号 → 系统通知 topic
                 _SYSTEM_UNAMES = {"UP主小助手", "哔哩哔哩", "哔哩哔哩直播小助手", "哔哩哔哩创作中心"}
-                is_system = dm_uname in _SYSTEM_UNAMES or "小助手" in dm_uname or "哔哩哔哩" in dm_uname
+                is_system = (dm_uname in _SYSTEM_UNAMES
+                             or "小助手" in dm_uname
+                             or "哔哩哔哩" in dm_uname
+                             or "创作中心" in dm_uname
+                             or "活动" in dm_uname)
                 if is_system:
                     tg.send_topic_md(tg.TOPIC_SYSTEM, prefix_md + msg, no_preview=True)
                     continue
