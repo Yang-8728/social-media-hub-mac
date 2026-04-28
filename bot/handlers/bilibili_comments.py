@@ -696,7 +696,7 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                 continue
             prefix_md = f"_{tg.esc(offline_prefix.strip())}_\n" if offline_prefix else ""
 
-            if is_comment and not offline_prefix:
+            if is_comment:
                 oid2  = item.get("oid")
                 rpid2 = item.get("rpid")
                 markup = tg.inline_keyboard([[("💬 回复", f"reply_c:{oid2}:{rpid2}")]])
