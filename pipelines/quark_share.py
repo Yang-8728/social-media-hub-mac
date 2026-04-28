@@ -1,7 +1,7 @@
 """
 粉丝视频分享：下载IG视频 → 打包zip → 上传夸克 → 生成分享链接 → 回复B站评论。
 """
-import os, sys, json, time, zipfile, requests, shutil, threading
+import os, sys, json, time, zipfile, requests, shutil, threading, re, difflib
 from datetime import datetime
 from pathlib import Path
 
@@ -24,6 +24,42 @@ SESSION_FILE  = str(PROJECT_DIR / "temp" / "ai_vanvan_session")
 SHARE_LOG     = PROJECT_DIR / "logs" / "quark_shares.jsonl"
 
 SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
+
+
+def _get_known_igs() -> list[str]:
+    """从分享日志获取所有已知 IG 账号名（status=ok 的记录）"""
+    known: set[str] = set()
+    if SHARE_LOG.exists():
+        with open(SHARE_LOG, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                    if r.get("ig") and r.get("status") == "ok":
+                        known.add(r["ig"])
+                except Exception:
+                    pass
+    return sorted(known)
+
+
+def _fuzzy_match_ig(raw: str) -> str | None:
+    """将 raw 模糊匹配到已知 IG 账号，返回最佳匹配或 None（完全没有近似时）"""
+    known = _get_known_igs()
+    if not known:
+        return None
+    if raw in known:
+        return raw
+
+    def norm(s: str) -> str:
+        return re.sub(r'[_.]', '', s.lower())
+
+    raw_n = norm(raw)
+    norm_map = {norm(k): k for k in known}
+
+    if raw_n in norm_map:
+        return norm_map[raw_n]
+
+    matches = difflib.get_close_matches(raw_n, list(norm_map.keys()), n=1, cutoff=0.8)
+    return norm_map[matches[0]] if matches else None
 
 
 def _fan_msg(ig_username: str, share_url: str) -> str:
@@ -302,6 +338,11 @@ def run(ig_username: str, target: str = None, thread_id: int = None):
         parts = target[3:].split(":", 1)
         uid_val = parts[0]
         fan_label = parts[1].replace("_", " ") if len(parts) > 1 else uid_val
+
+    matched = _fuzzy_match_ig(ig_username)
+    if matched and matched != ig_username:
+        _send(f"ℹ️ @{ig_username} 未找到，自动匹配为 @{matched}")
+        ig_username = matched
 
     cached_url = _lookup_cached_url(ig_username)
     if cached_url:
