@@ -18,7 +18,7 @@ SPAM_KEYWORDS = [
     "主页有", "点主页", "进主页", "看我主页", "点我头像",
     "关注有福利", "关注我有", "关注拿",
     "看完别打", "看完你别打", "看完记得别打", "不许打", "忍住", "胆小勿入", "不敢看", "不敢点", "别点开",
-    "出处在这", "看过来",
+    "出处在这", "看过来", "还是这个好用", "找了这么多年",
     "你懂的", "懂的都懂", "不解释", "自己悟",
     "羡慕吗", "心动了吗", "眼熟吗",
     "福利视频", "福利资源", "涩涩", "18+",
@@ -40,6 +40,8 @@ SPAM_KEYWORDS = [
 URL_RE       = re.compile(r'https?://\S+|b23\.tv/\S*|BV[a-zA-Z0-9]{10}', re.IGNORECASE)
 _B23_RE      = re.compile(r'b23\.tv/', re.IGNORECASE)
 _BILI_LINK_RE = re.compile(r'bilibili\.com/', re.IGNORECASE)
+# 混淆域名：hnnh. lat / hnnh .lat / hnnh.lat 等（点前后可能有空格）
+_OBFUS_DOMAIN_RE = re.compile(r'[A-Za-z0-9]{3,20}\s*\.\s*(lat|com|net|org|io|tv|cc|vip|xyz|top|club)', re.IGNORECASE)
 _IMG_RE = re.compile(r'\[[^\[\]]{3,}\]')
 
 # ── 文件路径 ──────────────────────────────────────────────────────────────────
@@ -179,6 +181,8 @@ def _normalize(text: str) -> str:
 def _is_spam(text: str) -> str | None:
     if _B23_RE.search(text) or _BILI_LINK_RE.search(text):
         return "含B站链接"
+    if _OBFUS_DOMAIN_RE.search(text):
+        return "含混淆域名"
     normalized = _normalize(text)
     for kw in SPAM_KEYWORDS + _load_custom_keywords():
         if kw in text or kw in normalized:
