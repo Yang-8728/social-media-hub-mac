@@ -36,8 +36,10 @@ def inline_keyboard(buttons: list[list[tuple[str, str]]]) -> dict:
 
 def _send_raw(chat_id, text: str, markdown=False, no_preview=False,
               reply_markup=None, reply_to_message_id: int = None,
-              thread_id: int = None) -> int | None:
+              thread_id: int = None, silent: bool = False) -> int | None:
     payload = {"chat_id": chat_id, "text": text}
+    if silent:
+        payload["disable_notification"] = True
     if markdown:
         payload["parse_mode"] = "MarkdownV2"
     if no_preview:
@@ -71,17 +73,20 @@ def send_md(text: str, no_preview=False, reply_markup=None) -> int | None:
 
 
 def send_topic(thread_id: int, text: str, markdown=False, no_preview=False,
-               reply_markup=None, reply_to_message_id: int = None) -> int | None:
+               reply_markup=None, reply_to_message_id: int = None,
+               silent: bool = False) -> int | None:
     """发消息到群组指定话题。"""
     return _send_raw(GROUP_CHAT_ID, text, markdown=markdown, no_preview=no_preview,
                      reply_markup=reply_markup, thread_id=thread_id,
-                     reply_to_message_id=reply_to_message_id)
+                     reply_to_message_id=reply_to_message_id, silent=silent)
 
 
 def send_topic_md(thread_id: int, text: str, no_preview=False,
-                  reply_markup=None, reply_to_message_id: int = None) -> int | None:
+                  reply_markup=None, reply_to_message_id: int = None,
+                  silent: bool = False) -> int | None:
     return send_topic(thread_id, text, markdown=True, no_preview=no_preview,
-                      reply_markup=reply_markup, reply_to_message_id=reply_to_message_id)
+                      reply_markup=reply_markup, reply_to_message_id=reply_to_message_id,
+                      silent=silent)
 
 
 def delete_message(chat_id, message_id: int) -> bool:
