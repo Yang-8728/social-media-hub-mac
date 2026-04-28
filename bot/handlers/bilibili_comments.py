@@ -678,7 +678,9 @@ def run():
         if not items:
             break
         backlog.extend(items)
-        backlog_dm_ts = max(backlog_dm_ts, new_dm_ts)
+        if new_dm_ts > backlog_dm_ts:
+            backlog_dm_ts = new_dm_ts
+            bili_monitor.update_dm_ts(new_dm_ts)  # 推进状态，防止下次 poll 返回相同 DM
 
     if backlog:
         print(f"[bilibili_comments] 发现 {len(backlog)} 条积压通知，开始处理", flush=True)
