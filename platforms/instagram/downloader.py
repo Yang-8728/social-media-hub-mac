@@ -98,6 +98,14 @@ class InstagramDownloader:
                             return True
                 except Exception:
                     pass
+                # test_login() 可能因 graphql 限速返回 401，用 profile fetch 兜底验证
+                try:
+                    from instaloader import Profile
+                    Profile.from_username(self.loader.context, account.username)
+                    self.logger.success(f"从 session 文件登录成功（profile 验证）: {account.username}")
+                    return True
+                except Exception:
+                    pass
 
             firefox_profile = getattr(account, 'firefox_profile', None) or (
                 hasattr(account, 'config') and account.config.get('firefox_profile', None)
