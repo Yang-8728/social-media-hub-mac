@@ -283,8 +283,9 @@ def fetch_new_dm(session, last_session_ts):
         if ts <= last_session_ts:
             continue
 
-        # 最后一条消息是 bot 自己发的，说明已经自动回复过，不再推送
-        if my_uid and last_msg.get("sender_uid") == my_uid:
+        # 最后一条消息是 bot 自己发的，且粉丝无未读消息 → 已处理，跳过
+        # unread_count > 0 说明粉丝还有未读（可能是 B站原生自动回复先触发），仍需推送
+        if my_uid and last_msg.get("sender_uid") == my_uid and unread == 0:
             new_ts = max(new_ts, ts)
             continue
 
