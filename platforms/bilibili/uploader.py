@@ -304,8 +304,9 @@ class BilibiliUploader:
             import json as _json
             cookies = self.driver.get_cookies()
             result = {c["name"]: c["value"] for c in cookies if "bilibili" in c.get("domain", "")}
-            out = os.path.join(os.path.dirname(os.path.dirname(
-                os.path.abspath(__file__))), "temp", f"bili_cookies_{self.account_name}.json")
+            out = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__)))), "temp", f"bili_cookies_{self.account_name}.json")
+            os.makedirs(os.path.dirname(out), exist_ok=True)
             with open(out, "w") as f:
                 _json.dump(result, f, indent=2)
             print(f"✅ Cookie 已保存: {out}")
