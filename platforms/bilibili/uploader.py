@@ -122,14 +122,9 @@ class BilibiliUploader:
         # TODO: 实现上传历史查询
         pass
     
-    def upload(self, video_path: str, category: str = "生活", subcategory: str = None) -> bool:
-        """优化的上传视频文件方法
-        
-        Args:
-            video_path: 视频文件路径
-            category: B站分区类别，如："生活"、"娱乐"、"科技"、"游戏"、"小剧场"等
-            subcategory: 子分区，如："搞笑研究所"（当主分区为"小剧场"时）
-        """
+    def upload(self, video_path: str, category: str = "生活", subcategory: str = None,
+               self_only: bool = False) -> bool:
+        """优化的上传视频文件方法"""
         try:
             print(f"📤 开始上传视频: {video_path}")
             
@@ -239,7 +234,11 @@ class BilibiliUploader:
             # 4. 自动设置分区
             self._set_category_fast(category, subcategory)
 
-            # 5. 等待并点击立即投稿
+            # 5. 仅自己可见（测试模式）
+            if self_only:
+                self._set_self_only_visibility()
+
+            # 6. 等待并点击立即投稿
             return self._submit_and_wait_success()
             
         except Exception as e:
@@ -869,6 +868,36 @@ class BilibiliUploader:
         """获取下一个集数序号（已弃用，改用 _increment_episode_number）"""
         return self._get_current_episode_number()
     
+    def _set_self_only_visibility(self):
+        """设置视频可见性为「仅自己可见」"""
+        try:
+            time.sleep(1)
+            # 找「开放范围」或「可见范围」相关控件
+            clicked = self.driver.execute_script("""
+                var labels = document.querySelectorAll('label, span, div');
+                for (var el of labels) {
+                    if (el.textContent.trim() === '仅自己可见') {
+                        el.click(); return true;
+                    }
+                }
+                return false;
+            """)
+            if not clicked:
+                # 备选：找 radio/select
+                elems = self.driver.find_elements(By.XPATH,
+                    "//*[contains(text(),'仅自己') or contains(text(),'自己可见')]")
+                for el in elems:
+                    if el.is_displayed():
+                        el.click()
+                        clicked = True
+                        break
+            if clicked:
+                print("🔒 已设置「仅自己可见」")
+            else:
+                print("⚠️ 未找到「仅自己可见」选项，默认公开")
+        except Exception as e:
+            print(f"⚠️ 设置可见性失败: {e}")
+
     def _set_category_fast(self, category: str, subcategory: str = None):
         """优化的快速设置分区 - 避免误点击分区合集"""
         try:

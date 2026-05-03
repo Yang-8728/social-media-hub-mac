@@ -346,30 +346,26 @@ def show_status(account_name: str = None):
         print(f"   合并文件夹: {folder_info['total_merged_folders']} 个")
 
 
-def run_upload(video_path: str, account_name: str, category: str = "小剧场", subcategory: str = "搞笑研究所"):
+def run_upload(video_path: str, account_name: str, category: str = "小剧场",
+               subcategory: str = "搞笑研究所", self_only: bool = False):
     """上传视频到Bilibili"""
     print(f"🚀 上传视频: {video_path}")
     print(f"📱 账号: {account_name}")
-    
-    # 根据账户显示不同的分区信息
-    if account_name == "aigf8728":
-        print("🏷️ 分区: 手动选择（跳过自动设置）")
-    else:
-        print(f"🏷️ 分区: {category}")
-        if subcategory:
-            print(f"🏷️ 子分区: {subcategory}")
-    
+    print(f"🏷️ 分区: {category}" + (f" / {subcategory}" if subcategory else ""))
+    if self_only:
+        print("🔒 测试模式：仅自己可见")
+
     try:
         # 验证文件存在
         if not os.path.exists(video_path):
             print(f"❌ 视频文件不存在: {video_path}")
             return False
-        
+
         # 创建上传器
         uploader = BilibiliUploader(account_name)
-        
+
         # 执行上传
-        result = uploader.upload(video_path, category, subcategory)
+        result = uploader.upload(video_path, category, subcategory, self_only=self_only)
         
         # 显示结果
         if result:
@@ -390,7 +386,7 @@ def run_upload(video_path: str, account_name: str, category: str = "小剧场", 
         return False
 
 
-def run_full_pipeline(account_name: str, download_limit: int = 5):
+def run_full_pipeline(account_name: str, download_limit: int = 5, self_only: bool = False):
     """运行完整流程：下载 → 合并 → 上传"""
     print(f"🚀 开始执行完整流程: {account_name}")
     print("="*60)
@@ -440,7 +436,8 @@ def run_full_pipeline(account_name: str, download_limit: int = 5):
         print(f"📹 找到最新视频: {os.path.basename(latest_video)}")
         
         # 上传视频
-        success_upload = run_upload(latest_video, account_name, "小剧场", "搞笑研究所")
+        success_upload = run_upload(latest_video, account_name, "小剧场", "搞笑研究所",
+                                    self_only=self_only)
         if not success_upload:
             print("❌ 上传失败")
             return False
@@ -516,6 +513,7 @@ def main():
     parser.add_argument("--account", type=str, help="指定账号名称")
     
     # 其他参数
+    parser.add_argument("--test", action="store_true", help="测试模式：上传为仅自己可见")
     parser.add_argument("--limit", type=int, default=50, help="下载数量限制")
     parser.add_argument("--merge-limit", type=int, help="合并视频数量限制")
     parser.add_argument("--all", action="store_true", help="处理所有账号")
@@ -548,7 +546,7 @@ def main():
     if account_name and not has_action:
         # 只指定账号，执行全流程
         print(f"🎯 检测到纯账号参数，执行完整流程...")
-        run_full_pipeline(account_name, args.limit)
+        run_full_pipeline(account_name, args.limit, self_only=args.test)
         
     elif args.login:
         if account_name:
