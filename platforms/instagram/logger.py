@@ -130,7 +130,8 @@ class Logger:
 
     def is_downloaded(self, shortcode: str) -> bool:
         log_data = self.load_download_log()
-        if any(d["shortcode"] == shortcode and d["status"] == "success" for d in log_data["downloads"]):
+        if any(d["shortcode"] == shortcode and d["status"] in ("success", "pre_existing")
+               for d in log_data["downloads"]):
             return True
         return self._check_file_exists_by_shortcode(shortcode)
 

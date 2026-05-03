@@ -133,20 +133,12 @@ class BilibiliUploader:
         try:
             print(f"📤 开始上传视频: {video_path}")
             
-            # 根据账户显示不同的分区信息
-            if self.account_name == "aigf8728":
-                print("🏷️ 分区: 手动选择（跳过自动设置）")
-            else:
-                print(f"🏷️ 目标分区: {category}")
-                if subcategory:
-                    print(f"🏷️ 目标子分区: {subcategory}")
+            print(f"🏷️ 目标分区: {category}")
+            if subcategory:
+                print(f"🏷️ 目标子分区: {subcategory}")
             
             # 设置驱动
             if not self.setup_driver():
-                if self.account_name == "aigf8728":
-                    print("🔒 aigf8728账户：Chrome启动失败，但会尝试保持浏览器状态")
-                    # 即使启动失败，也不立即返回False，让程序继续尝试
-                    print("💡 请手动检查Chrome配置或重新尝试")
                 return False
             
             # 直接打开B站上传页面（应该已经登录）
@@ -244,12 +236,8 @@ class BilibiliUploader:
             desc_with_quark = quark_header + "\n————————————————\n" + chapter_list if chapter_list else quark_header
             self._set_description(desc_with_quark)
 
-            # 4. 根据账户决定是否设置分区
-            if self.account_name == "aigf8728":
-                print("ℹ️ aigf8728账户跳过分区设置，请在页面手动选择分区")
-            else:
-                # ai_vanvan等其他账户自动设置分区
-                self._set_category_fast(category, subcategory)
+            # 4. 自动设置分区
+            self._set_category_fast(category, subcategory)
 
             # 5. 等待并点击立即投稿
             return self._submit_and_wait_success()
@@ -267,14 +255,9 @@ class BilibiliUploader:
                 except:
                     pass
             
-            # 根据账户和错误类型决定是否关闭浏览器
-            if self.account_name == "aigf8728" and is_login_issue:
-                print("🔒 aigf8728账户：检测到登录问题，浏览器保持打开状态，请手动登录")
-                print("💡 请在浏览器中登录后重新尝试上传")
-            else:
-                print("关闭浏览器...")
-                if hasattr(self, 'driver') and self.driver:
-                    self.driver.quit()
+            print("关闭浏览器...")
+            if hasattr(self, 'driver') and self.driver:
+                self.driver.quit()
             return False
     
     def _get_chapter_list_for_video(self, video_path: str) -> str:
@@ -706,28 +689,12 @@ class BilibiliUploader:
             # 获取当前序号（不增加）
             current_number = self._get_current_episode_number()
             
-            # 根据账户名生成不同的标题格式
-            if self.account_name == "aigf8728":
-                # 尝试从视频路径提取博主ID
-                blogger_id = self._extract_blogger_id(video_path) if video_path else "[博主ID]"
-                print(f"🔍 调试信息 - 视频路径: {video_path}")
-                print(f"🔍 调试信息 - 提取的博主ID: '{blogger_id}'")
-                print(f"🔍 调试信息 - 当前序号: {current_number}")
-                
-                title = f"ins你的海外第{current_number}个女友:{blogger_id}"
-                print(f"🔍 调试信息 - 生成的标题: '{title}'")
-            else:
-                # 默认 ai_vanvan 格式
-                title = f"ins海外离大谱#{current_number}"
+            title = f"ins海外离大谱#{current_number}"
             
             return title
         except Exception as e:
             print(f"⚠️ 生成标题失败: {e}")
-            # 如果获取序号失败，使用默认格式
-            if self.account_name == "aigf8728":
-                return "ins你的海外第6个女友:[博主ID]"
-            else:
-                return "ins海外离大谱#84"
+            return "ins海外离大谱#1"
     
     def _extract_blogger_id(self, video_path: str) -> str:
         """从视频路径中提取博主ID"""
@@ -827,13 +794,7 @@ class BilibiliUploader:
                 except Exception as e:
                     print(f"⚠️ 读取配置文件失败: {e}")
                 
-                # 如果配置读取失败，使用默认序号
-                default_numbers = {
-                    'ai_vanvan': 84,  # 当前进度
-                    'aigf8728': 6,    # 从配置的起始序号开始
-                    'gaoxiao': 1      # 新账号从1开始
-                }
-                return default_numbers.get(self.account_name, 1)
+                return 1
         except Exception as e:
             print(f"⚠️ 获取当前序号失败: {e}")
             return 1

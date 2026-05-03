@@ -1,13 +1,13 @@
 ---
 name: bilibili
-description: Run the full ai_vanvan Bilibili pipeline (Instagram download → merge → upload to Bilibili)
+description: Run the full aigf8728 Bilibili pipeline (Instagram download → merge → upload to Bilibili)
 allowed-tools: Bash
 ---
 
-Run the full ai_vanvan pipeline in the background and stream its output.
+Run the full aigf8728 pipeline in the background and stream its output.
 
 Steps:
-1. Use Bash to run: `cd /Users/yanglan/Code/social-media-hub && python3 -u main.py --ai_vanvan`
+1. Use Bash to run: `cd /Users/yanglan/Code/social-media-hub && python3 -u main.py --aigf8728`
    - Set timeout to 3600000ms (1 hour) since upload + review wait can take a long time
    - Run in background: false (wait for completion)
 2. Parse the output and report:
