@@ -448,8 +448,7 @@ class BilibiliUploader:
             sess = _req.Session()
             sess.cookies.update(cookies)
             msg = "看置顶哦～"
-            # 在 5s / 30s / 60s / 120s / 180s 各发一条
-            for ts in [5000, 30000, 60000, 120000, 180000]:
+            for ts in [5000]:
                 resp = sess.post('https://api.bilibili.com/x/v2/dm/post', data={
                     'type': 1, 'oid': aid, 'msg': msg,
                     'progress': ts, 'color': 16777215,

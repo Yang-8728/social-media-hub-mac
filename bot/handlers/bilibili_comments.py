@@ -839,23 +839,7 @@ def _process_items(items, offline_prefix="", new_dm_ts: int = 0):
                     nt.record(mid, f"✉️私信 {dm_uname}")
                     if new_dm_ts:
                         bili_monitor.update_dm_ts(new_dm_ts)
-                    if ig_names:
-                        _pending_shares_add(dm_uid, dm_uname, ig_names)
-                        import threading
-                        def _auto_share(uid=dm_uid, uname=dm_uname, igs=ig_names, notif=mid):
-                            from pipelines import quark_share
-                            any_success = False
-                            for ig in igs:
-                                ok = quark_share.run(ig, f"dm:{uid}:{uname.replace(' ','_')}",
-                                                     thread_id=tg.TOPIC_DM)
-                                if ok:
-                                    _pending_shares_done(uid, ig)
-                                    any_success = True
-                            if any_success and notif:
-                                tg.edit_reply_markup(notif, tg.inline_keyboard([[("✅ 已分享", "noop")]]))
-                                from bot import notification_tracker as _nt
-                                _nt.resolve(notif)
-                        threading.Thread(target=_auto_share, daemon=True).start()
+                    # 自动分享功能已关闭，仅保留 TG 通知和手动分享按钮
 
             else:
                 tg.send_md(prefix_md + msg, no_preview=True)
