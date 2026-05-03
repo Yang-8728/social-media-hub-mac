@@ -409,6 +409,7 @@ class BilibiliUploader:
                     self.driver.get(href)
                     time.sleep(6)
                     self._post_chapter_comment(chapter_list)
+                    self._post_danmaku(href)
                     return
 
                 except Exception as e:
@@ -420,10 +421,54 @@ class BilibiliUploader:
         except Exception as e:
             print(f"⚠️ 等待审核流程出错: {e}")
 
+    def _post_danmaku(self, video_url: str):
+        """通过 API 在视频多个时间点发弹幕「看置顶哦～」"""
+        import re, requests as _req
+        try:
+            bvid_match = re.search(r'/(BV[A-Za-z0-9]+)', video_url or self.driver.current_url)
+            if not bvid_match:
+                print("⚠️ 无法提取 bvid，跳过弹幕")
+                return
+            bvid = bvid_match.group(1)
+
+            cookies = {c['name']: c['value'] for c in self.driver.get_cookies()
+                       if 'bilibili' in c.get('domain', '')}
+            csrf = cookies.get('bili_jct', '')
+            if not csrf:
+                print("⚠️ 未找到 csrf，跳过弹幕")
+                return
+
+            r = _req.get('https://api.bilibili.com/x/web-interface/view',
+                         params={'bvid': bvid}, cookies=cookies, timeout=10)
+            aid = (r.json().get('data') or {}).get('aid')
+            if not aid:
+                print("⚠️ 获取 aid 失败，跳过弹幕")
+                return
+
+            sess = _req.Session()
+            sess.cookies.update(cookies)
+            msg = "看置顶哦～"
+            # 在 5s / 30s / 60s / 120s / 180s 各发一条
+            for ts in [5000, 30000, 60000, 120000, 180000]:
+                resp = sess.post('https://api.bilibili.com/x/v2/dm/post', data={
+                    'type': 1, 'oid': aid, 'msg': msg,
+                    'progress': ts, 'color': 16777215,
+                    'fontsize': 25, 'pool': 0, 'mode': 1,
+                    'rnd': int(time.time() * 1000000), 'csrf': csrf,
+                }, timeout=10)
+                code = resp.json().get('code', -1)
+                if code == 0:
+                    print(f"✅ 弹幕已发送 ({ts//1000}s)")
+                else:
+                    print(f"⚠️ 弹幕发送失败 ({ts//1000}s): {resp.json().get('message')}")
+                time.sleep(1)
+        except Exception as e:
+            print(f"⚠️ 发弹幕出错: {e}")
+
     def _post_chapter_comment(self, chapter_list: str):
         """在当前视频页发章节列表评论并置顶"""
-        header = "知道你们爱看啥，发私信带ID就可以拿合集哦"
-        chapter_list = header + "\n————————————————\n" + chapter_list if chapter_list else header
+        header = "知道你们爱看啥\n长按复制后打开夸克浏览器即可\n：https://pan.quark.cn/s/8917bf25ada9"
+        chapter_list = header + "\n——\n" + chapter_list if chapter_list else header
         try:
             print("💬 开始发评论...")
 
